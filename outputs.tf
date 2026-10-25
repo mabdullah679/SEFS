@@ -15,3 +15,5 @@ output "reader_log_group" { value = module.apps.reader_log_group }
 output "reader_task_definition_arn" { value = module.apps.reader_task_definition_arn }
 output "region" { value = var.region }
 output "name" { value = var.name }
+output "bruno_reader_role_arn" { value = module.access.role_arn }
+output "ssm_prefix" { value = module.access.ssm_prefix }

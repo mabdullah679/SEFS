@@ -71,3 +71,35 @@ module "apps" {
   writer_interval_seconds = var.writer_interval_seconds
   reader_poll_seconds     = var.reader_poll_seconds
 }
+
+module "access" {
+  source = "./modules/access"
+
+  name                   = var.name
+  region                 = var.region
+  trusted_principal_arns = var.bruno_trusted_principal_arns
+}
+
+# Deployed IDs for the Bruno collection (non-secret). Update with `make apply-one CHILD=registry`.
+module "registry" {
+  source = "./modules/registry"
+
+  name = var.name
+  values = {
+    region                 = var.region
+    vpc_id                 = module.network.vpc_id
+    private_subnet_ids     = join(",", module.network.private_subnet_ids)
+    apps_security_group_id = module.security.apps_security_group_id
+    efs_security_group_id  = module.security.efs_security_group_id
+    file_system_id         = module.efs.file_system_id
+    writer_access_point_id = module.efs.writer_access_point_id
+    reader_access_point_id = module.efs.reader_access_point_id
+    backup_vault_name      = module.backup.vault_name
+    backup_plan_id         = module.backup.plan_id
+    cluster_name           = module.apps.cluster_name
+    writer_service_name    = module.apps.writer_service_name
+    reader_service_name    = module.apps.reader_service_name
+    writer_log_group       = module.apps.writer_log_group
+    reader_log_group       = module.apps.reader_log_group
+  }
+}

@@ -104,3 +104,9 @@ variable "allowed_account_id" {
     error_message = "allowed_account_id must be a 12-digit AWS account ID."
   }
 }
+
+variable "bruno_trusted_principal_arns" {
+  description = "Principals allowed to assume the Bruno read-only role. Empty = any principal in this account that also holds sts:AssumeRole (admins do)."
+  type        = list(string)
+  default     = []
+}
