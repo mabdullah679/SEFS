@@ -75,10 +75,13 @@ jobs:
           EOF
       - run: terraform init -input=false -backend-config=backend.hcl
       - name: apply
-        env: { CHILDREN: "${{ steps.diff.outputs.children }}" }
+        env:
+          CHILDREN: "${{ steps.diff.outputs.children }}"
+          HEAD_MSG: "${{ github.event.head_commit.message }}"
         run: |
           set -euo pipefail
           bash scripts/adopt-orphans.sh   # a cancelled run can leave ECS services in AWS but not in state
+          case "$HEAD_MSG" in *"check full"*) echo "'check full' in the commit message: full apply"; CHILDREN=full ;; esac
           if [ "$(terraform state list 2>/dev/null | wc -l)" -eq 0 ]; then
             echo "remote state is empty: the first deploy is always a full apply"; CHILDREN=full
           fi

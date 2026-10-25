@@ -11,7 +11,7 @@ Only one deploy runs at a time, and a lock stops a laptop deploy and a GitHub de
 ONE-TIME SETUP (about 10 minutes)
 1. Run ./setup.sh and, when asked, give your GitHub repo as owner/repo. That creates the shared state storage (a private, versioned, encrypted bucket and a lock table) and a deploy role that only that repo's main branch can use. Keep the small bootstrap/terraform.tfstate file; it is the only record of the state bucket.
 2. In GitHub, under the repo's Actions variables, add: AWS_REGION, AWS_ACCOUNT_ID, AWS_DEPLOY_ROLE_ARN, TF_STATE_BUCKET, TF_LOCK_TABLE. The values come from the bootstrap outputs. No secrets are needed.
-3. Push to main with "check" in the message.
+3. Push to main with "check" in the message. Writing "check full" deploys everything regardless of what changed; use it after a failed or cancelled run.
 
 AFTER SETUP
 make up, make apply-one and make down all use the shared state. The local tests never touch it.

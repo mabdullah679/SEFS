@@ -4,6 +4,8 @@ Owner's intent (2026-10-25): set the project up once; afterwards, pushing to `ma
 
 ## What a "check" push does
 
+`check full` in the message forces a full apply regardless of which paths changed (use it after a failed or cancelled run, or when a child was added).
+
 1. **Unit job** (every push, no AWS): `tests/unit/run.sh` (mocked Terraform), `tests/ci/selftest.sh`.
 2. **Deploy job** (only if the commit message contains `check`):
    - assumes the deploy role via OIDC (no AWS keys in GitHub),
