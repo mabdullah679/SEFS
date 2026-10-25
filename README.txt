@@ -12,6 +12,7 @@ make up: checks your tools and which AWS account you're in, then deploys everyth
 make verify: checks every requirement against what AWS actually reports, then confirms Terraform sees no difference between the code and what's running.
 make e2e (needs E2E_CONFIRM=yes): proves the writer writes, the reader reads, the reader can't write even with its read-only flag off, and the data survives the apps being destroyed.
 CONFIRM_DESTROY_DATA=yes make down: deletes everything including the data, then checks nothing is left.
+Before the first make up, create a file called account.auto.tfvars in the repo root (it is kept out of git) containing the 12-digit AWS account ID that Terraform is allowed to touch, and optionally the region. make up refuses to run without it, or if your AWS login belongs to a different account; Terraform repeats that check itself. The real test run on 2026-10-25 deployed to the Sydney region (ap-southeast-2) in account 445137568806, set through that file. If you set no region, the default is us-east-1. Only Sydney has actually been run.
 To update one piece only: make apply-one CHILD=network, security, efs, backup, images or apps. docs/COMPONENTS.md says which piece owns what.
 
 WHY "make down" IS SPECIAL

@@ -38,7 +38,20 @@ make e2e         # E2E_CONFIRM=yes required: write/read, ro proof with the mount
 CONFIRM_DESTROY_DATA=yes make down   # deletes everything, INCLUDING the EFS data, then sweeps for leftovers
 ```
 
-`make up AUTO=1` skips the apply prompt. Region defaults to `us-east-1`; override with `TF_VAR_region=<region>`.
+`make up AUTO=1` skips the apply prompt.
+
+### Account and region (required before `make up`)
+
+Create `account.auto.tfvars` in the repo root (git-ignored, so it never leaves your machine):
+
+```hcl
+allowed_account_id = "<12-digit AWS account ID>"   # the ONLY account Terraform may touch
+region             = "ap-southeast-2"              # optional; the code default is us-east-1
+```
+
+`make up` refuses to run without the file, or if your AWS credentials resolve to any other account, and the provider repeats the check, so a mismatched login fails before anything is created.
+
+**The live proof of 2026-10-25 deployed to `ap-southeast-2` (Sydney), account `445137568806`**, set through that file. Without a `region` line, the default is `us-east-1`; `TF_VAR_region=<region>` also overrides it. Region is not baked into any resource name, so any region with at least 2 AZs works, but only Sydney has been run.
 
 ### Updating one component
 
