@@ -52,8 +52,9 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 | Goal | Command | Notes |
 |---|---|---|
-| Fresh clone, everything | `./setup.sh` | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying |
-| Deploy / redeploy | `make up` (`AUTO=1` skips the prompt) | preflight refuses the wrong account, a missing `backend.hcl`, or an `aws login` session profile (see §7) |
+| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying |
+| Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed |
+| Deploy / redeploy | `make up` or `./sefs up` (`AUTO=1` skips the prompt) | preflight refuses the wrong account, a missing `backend.hcl`, or an `aws login` session profile (see §7) |
 | One child | `make apply-one CHILD=efs` | |
 | Live checks | `make verify` | every R-ID against AWS + `terraform plan` must be clean |
 | Live behaviour | `E2E_CONFIRM=yes make e2e` | write/read, IAM read-only proof, destroy-apps-and-recover |

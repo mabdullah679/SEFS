@@ -3,6 +3,8 @@
 One Terraform apply builds, in your AWS account, a multi-AZ VPC, an encrypted EFS shared by two ECS Fargate apps (a Python writer and a Spring Boot reader on the same path, the reader unable to write), 35-day backups, an IA lifecycle, alarms and a dashboard, a read-only verification role, and the state/CI plumbing so that every later change deploys itself from a push to `main`.
 Implements [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx); requirements are numbered R1–R15 in [PLAN.md §1](PLAN.md#1-requirements-numbered-so-every-file-and-test-can-cite-one). Agents: read [AGENTS.md](AGENTS.md) first.
 
+**Run this single command and enter inputs where requested:** `./sefs setup` (after signing in to AWS in your shell). Everything else is `./sefs <verb>`; `./sefs help` lists them. [sefs](sefs) is a thin wrapper over [setup.sh](setup.sh), the [Makefile](Makefile) and the SSM registry; the longer steps below are the same thing spelled out.
+
 ```
  your laptop ──./setup.sh──► bootstrap (state bucket, lock table, CI role)  ──┐
  your GitHub ──push "check"─► Actions: OIDC → shared state → apply → verify ──┤
@@ -44,15 +46,17 @@ The host does **not** need Java, Maven or Python: both apps build inside Docker.
 2. Sign in to AWS in your shell (for example `aws login --profile work`, then `export AWS_PROFILE=work`).
 3. One command:
    ```bash
-   ./setup.sh
+   ./sefs setup        # same as ./setup.sh
    ```
    It checks the tools, shows the account your credentials resolve to and asks you to confirm it, asks for the region, an alarm e-mail (optional) and your GitHub repo (`you/sefs`), writes the git-ignored `account.auto.tfvars`, creates the state bucket, lock table and CI role (once), prompts for any secret in [secrets.manifest](secrets.manifest) (none today) and stores it only in SSM, then runs `make up` (≈ 8 min). `./setup.sh --no-deploy` stops before the deploy.
 4. Wire CI once: in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `AWS_REGION`, `AWS_ACCOUNT_ID`, `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` from `setup.sh`'s final output (no secrets: OIDC replaces keys). Details: [docs/CI.md](docs/CI.md#one-time-setup-owner-10-min).
 5. From now on, push to `main` with **`check`** in the commit message: the changed children redeploy and the live checks run. `check full` redeploys everything.
 
-Identical on macOS, Linux and WSL2:
+Identical on macOS, Linux and WSL2 (`./sefs <verb>` and `make <verb>` are the same thing):
 
 ```bash
+./sefs show efs                        # any deployed ID by keyword (efs, subnet, cluster, log, backup, ...) from SSM
+./sefs status                          # services, file system, alarms on one screen; also: logs writer|reader, alarms, url
 make verify                            # every requirement checked against live AWS + plan must be clean
 E2E_CONFIRM=yes make e2e               # write/read, read-only proof with the mount flag off, persistence
 make bruno                             # the Bruno collection (after make bruno-profile SOURCE=<login profile>)
@@ -161,7 +165,7 @@ make test-setup      # setup.sh with a fake aws: a secret never touches argv or 
 | [modules/access](modules/access/main.tf) · [modules/registry](modules/registry/main.tf) | Read-only verification role; deployed IDs in SSM |
 | [modules/bootstrap](modules/bootstrap/main.tf) · [bootstrap/](bootstrap/main.tf) | State bucket, lock table, GitHub OIDC deploy role (once, local state) |
 | [apps/writer-python](apps/writer-python/writer.py) · [apps/reader-springboot](apps/reader-springboot/src/main/java/com/sefs/reader/SharedDirPoller.java) | The two apps |
-| [setup.sh](setup.sh) · [Makefile](Makefile) · [scripts/](scripts) | Fresh-clone setup; targets; teardown, orphan adoption, credential-free profiles, CI change mapper |
+| [sefs](sefs) · [setup.sh](setup.sh) · [Makefile](Makefile) · [scripts/](scripts) | The one command (wrapper + keyword reads from SSM); fresh-clone setup; targets; teardown, orphan adoption, credential-free profiles, CI change mapper |
 | [.github/workflows/check.yml](.github/workflows/check.yml) | "check" push → changed children redeploy → verify |
 | [bruno/sefs](bruno/sefs) | Live verification collection |
 | [tests/unit](tests/unit) · [tests/mutation](tests/mutation/run.sh) · [tests/contract](tests/contract) · [tests/setup](tests/setup/selftest.sh) · [tests/ci](tests/ci/selftest.sh) · [tests/live](tests/live) | Test suites |
