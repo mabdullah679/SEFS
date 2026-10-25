@@ -163,6 +163,14 @@ Requirement → code → test mapping: [docs/TRACEABILITY.md](docs/TRACEABILITY.
 | [modules/backup](modules/backup/main.tf) | Vault, 35-day plan, selection, role |
 | [modules/images](modules/images/main.tf) | ECR repos + build/push during apply |
 | [modules/apps](modules/apps/main.tf) | ECS cluster, task definitions, task roles, services |
+| [modules/observability](modules/observability/main.tf) | Alarms → SNS, dashboard, log-derived metrics, opt-in cost allocation tag |
+| [modules/access](modules/access/main.tf) | `sefs-bruno-reader`: least-privilege read-only role for Bruno and the GUI |
+| [modules/registry](modules/registry/main.tf) | Deployed IDs published to SSM `/sefs/outputs/*` |
+| [modules/bootstrap](modules/bootstrap/main.tf) · [bootstrap/](bootstrap/main.tf) | State bucket, lock table, GitHub OIDC deploy role (run once, local state) |
+| [AGENTS.md](AGENTS.md) | The whole picture in one file, written for an agent that has never seen the repo |
+| [setup.sh](setup.sh) · [scripts/](scripts) | Fresh-clone setup; teardown; credential-free AWS profiles; CI change mapper |
+| [bruno/sefs](bruno/sefs) | Self-hydrating live verification collection |
+| [.github/workflows/check.yml](.github/workflows/check.yml) · [docs/CI.md](docs/CI.md) | "check" push → changed children redeploy → verify |
 | [apps/writer-python](apps/writer-python/writer.py) | Writer |
 | [apps/reader-springboot](apps/reader-springboot/src/main/java/com/sefs/reader/SharedDirPoller.java) | Reader |
 | [scripts/teardown.sh](scripts/teardown.sh) | Full delete including data |

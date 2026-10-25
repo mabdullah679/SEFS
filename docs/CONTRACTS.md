@@ -23,6 +23,7 @@ Requirement IDs R1–R15 are defined in [../PLAN.md](../PLAN.md) §1.
 | apps | `apps/`, `modules/images/`, `tests/contract/` | R2/R3 behavior, R10 behavior |
 | verification | `tests/unit/`, `tests/mutation/`, `tests/live/`, `docs/TRACEABILITY.md` | all |
 | lead | everything at repo root, `docs/` (other than TRACEABILITY) | integration |
+| lead (added after the fleet) | `modules/access`, `modules/registry`, `modules/observability`, `modules/bootstrap`, `bootstrap/`, `bruno/`, `scripts/`, `setup.sh`, `.github/`, `tests/setup`, `tests/ci` | Bruno, SSM registry, alarms/dashboard, remote state + CI role, CI workflow |
 
 ## 2. Fixed values
 
@@ -76,6 +77,9 @@ Requirement IDs R1–R15 are defined in [../PLAN.md](../PLAN.md) §1.
   - reader: `ClientMount` only.
 - Task defs: Fargate, `runtime_platform { operating_system_family = "LINUX", cpu_architecture = "ARM64" }`, 256 CPU / 512 MB writer, 512 / 1024 reader (JVM). Volume `efs_volume_configuration { file_system_id, transit_encryption = "ENABLED", authorization_config { access_point_id, iam = "ENABLED" } }`. Mount at `container_mount_path`; writer `readOnly = false`, reader `readOnly = true`. Env: `SHARED_DIR`, `WRITER_INTERVAL_SECONDS` / `READER_POLL_SECONDS`.
 - Services: `launch_type = "FARGATE"`, `platform_version = "1.4.0"` or LATEST, desired 1 each, `network_configuration { subnets = private_subnet_ids, security_groups = [apps_security_group_id], assign_public_ip = false }`. Services must not be created before `efs_dependency_ids` exist (e.g. a `terraform_data` with `triggers_replace = var.efs_dependency_ids` that the services `depends_on`). `wait_for_steady_state = true` on both.
+
+### observability (lead)
+- Alarms (10) all notify `aws_sns_topic.alerts`; service-down alarms treat a missing metric as breaching; `WRITE_PROBE ALLOWED` in the reader log alarms within one minute (R3 control broken). NAT alarms are keyed by AZ, never by NAT ID (unknown at plan). Dashboard `<name>-overview`. Cost allocation tag activation is opt-in.
 
 ### apps (application code) — log lines are a test interface
 - **writer (Python 3.12, stdlib only):** every `WRITER_INTERVAL_SECONDS`, write `$SHARED_DIR/<utc-iso>-<uuid>.json` (payload incl. timestamp + seq) via temp file + `fsync` + atomic rename (reader never sees a partial file). Log exactly: `WROTE <filename> sha256=<hex>`. Startup log: `WRITER_START uid=<uid> gid=<gid> dir=<dir>`. Any write error: `WRITE_ERROR <errno-name> <message>` and keep running.
