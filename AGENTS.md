@@ -41,6 +41,7 @@ One root ("mother", [main.tf](main.tf)) calls child modules; **one state** (S3).
 | `backup` | vault, daily plan, selection, role | `retention_days ≥ 35` (validated) |
 | `images` | ECR repos + build/push **inside the apply** | tag = content hash; 20-min watchdog × 3 attempts; needs ~250 KB/s uplink |
 | `apps` | ECS cluster, task defs, task roles (`name_prefix`), services, log groups | writer 256/512, reader 512/1024, ARM64, private subnets |
+| `observability` | SNS alerts, 10 alarms, log metric filters, dashboard, opt-in cost tag | NAT alarms keyed by AZ; `WRITE_PROBE ALLOWED` in reader logs alarms within 1 min |
 | `access` | `sefs-bruno-reader` role | read-only, SSM scoped to `/sefs/*`, KMS decrypt only via SSM |
 | `registry` | SSM `/sefs/outputs/*` | non-secret deployed IDs; secrets go under `/sefs/secrets/*` and are written only by `setup.sh` |
 | `bootstrap/` (separate root, local state) | state bucket, lock table, GitHub OIDC role | run once per account+region; never managed by CI |
@@ -67,12 +68,12 @@ Account guard: `allowed_account_id` in `account.auto.tfvars` is enforced by the 
 
 | Layer | Where | Latest result |
 |---|---|---|
-| Unit, mocked provider, offline | `tests/unit/` | 37/37 + 4/4 apply-mode (2026-10-25) |
-| Mutation (each guard broken on purpose must be caught) | `tests/mutation/run.sh` | 44/44 killed, no-op control survives |
+| Unit, mocked provider, offline | `tests/unit/` | 45/45 + 4/4 apply-mode (2026-10-25) |
+| Mutation (each guard broken on purpose must be caught) | `tests/mutation/run.sh` | 48/48 killed, no-op control survives |
 | Docker contract (writer/reader as real UIDs) | `tests/contract/` | 16/16 |
 | setup.sh secret safety (fake `aws`) | `tests/setup/selftest.sh` | 5/5; mutation-proven |
 | CI change mapper | `tests/ci/selftest.sh` | 9/9; mutation-proven |
-| Live verify | `tests/live/verify.sh` | 15/15 + zero drift (2026-10-25, ap-southeast-2) |
+| Live verify | `tests/live/verify.sh` | 15/15 + zero drift (2026-10-25, ap-southeast-2); OBS line added after that run |
 | Live e2e | `tests/live/e2e.sh` | E1–E4 pass (2026-10-25) |
 | Bruno collection live | `bruno/sefs` | **not yet run live** (see PLAN.md §7) |
 | GitHub Actions "check" | `.github/workflows/check.yml` | OIDC assume proven 2026-10-25; first full CI deploy in progress at time of writing |
@@ -85,7 +86,7 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 - **Deployed IDs:** SSM `/sefs/outputs/*` (plain Strings, Terraform-managed).
 - **Secrets:** SSM `/sefs/secrets/*` (SecureString, written by `setup.sh` only, never by Terraform). Today: none.
 - **Logs:** CloudWatch `/ecs/sefs/writer`, `/ecs/sefs/reader`. Log lines are a test interface: `WROTE <file> sha256=<hex>`, `READ <file> sha256=<hex>`, `WRITE_PROBE DENIED <reason>`.
-- **Decisions:** [docs/DECISIONS.md](docs/DECISIONS.md) (D1–D22 so far). **Plan and queue:** [PLAN.md](PLAN.md).
+- **Decisions:** [docs/DECISIONS.md](docs/DECISIONS.md) (D1–D24 so far). **Plan and queue:** [PLAN.md](PLAN.md).
 
 ## 7. Things that bit us (so you don't re-learn them)
 
