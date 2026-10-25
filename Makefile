@@ -71,7 +71,7 @@ bruno-profile: ## Install the credential-free 'sefs-bruno' AWS profile: make bru
 	bash scripts/bruno-profile.sh install "$(SOURCE)" "$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
 
 bruno: ## Run the self-hydrating Bruno collection against the live deployment (read-only role)
-	bru run bruno/sefs --env aws --env-var awsRegion="$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
+	cd bruno/sefs && bru run --env aws --env-var awsRegion="$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' ../../account.auto.tfvars)"
 
 cost: ## Running cost from the AWS Pricing API: per hour, per minute, 30 days (read-only; needs pricing:GetProducts)
 	python3 scripts/cost.py --region "$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"

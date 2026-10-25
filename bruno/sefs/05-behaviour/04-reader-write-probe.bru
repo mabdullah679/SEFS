@@ -1,0 +1,50 @@
+meta {
+  name: R3 — reader's write probe was DENIED (read from the head of its current stream)
+  type: http
+  seq: 4
+}
+
+post {
+  url: https://logs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: Logs_20140328.GetLogEvents
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: logs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "logGroupName": "{{reader_log_group}}",
+    "logStreamName": "{{reader_log_stream}}",
+    "startFromHead": true,
+    "limit": 100
+  }
+}
+
+docs {
+  The probe is logged once at reader start-up (line ~5 of the task's stream), so FilterLogEvents over a wide
+  window is the wrong tool: CloudWatch answers wide windows with an empty first page plus a nextToken, which a
+  single Bruno request cannot follow. GetLogEvents from the head of the current stream is one deterministic call.
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const ev = (res.getBody().events || []).map(e => e.message);
+  test("reader logged WRITE_PROBE DENIED and never ALLOWED", function(){
+    expect(ev.some(m => /^WRITE_PROBE DENIED /.test(m)), "no WRITE_PROBE DENIED in the first 100 lines").to.equal(true);
+    expect(ev.some(m => /^WRITE_PROBE ALLOWED/.test(m))).to.equal(false);
+  });
+}

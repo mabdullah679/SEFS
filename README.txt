@@ -33,6 +33,10 @@ TESTS AND WHAT HAS BEEN PROVEN
 Local tests need no AWS account: fake-AWS tests 45 of 45 plus 4 of 4; 48 deliberate breaks all caught; the Docker writer/reader test 16 of 16; the setup self-test 5 of 5; the CI change mapper 9 of 9; the live checker's own self-test 29 scenarios.
 Real AWS, Sydney, 2026-10-25: one command deployed 55 resources in about 8 minutes; the live checker passed 15 of 15 with zero drift; the writer wrote 40 files and the reader read all 40 back identical; the reader was refused even with its read-only flag off; 46 files survived destroying and rebuilding the apps; teardown left the account clean, checked independently.
 GitHub Actions, 2026-10-25: a "check" push borrowed the deploy role, used the shared state, deployed everything, confirmed zero drift and passed all 16 live checks, with the deploy job taking under two minutes.
+Bruno, 2026-10-26, against that same stack: all 20 requests and 58 of 58 checks passed using only the read-only checking role; feeding it made-up security group IDs makes the network checks fail, which proves they're really looking.
+
+WHAT IT COSTS TO KEEP RUNNING
+make cost asks AWS for today's prices in your region. Sydney, 2026-10-26: about 17 cents an hour, a third of a cent a minute, about 125 dollars for 30 days. Three quarters of that is the two NAT gateways (one per data centre); a setting halves that. Published rates, not an invoice; the 30-day number is the hourly rate times 720 hours, because the stack has not run long enough for a real monthly bill.
 Not proven: which exact error a blocked write returns (we saw "read-only file system"); a backup job finishing (the 35-day backup is proven as configuration only); a control run of the same read-only test using the writer's role.
 
 WHERE THINGS ARE

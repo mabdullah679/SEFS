@@ -1,0 +1,41 @@
+meta {
+  name: hydrate — the reader's current log stream
+  type: http
+  seq: 3
+}
+
+post {
+  url: https://logs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: Logs_20140328.DescribeLogStreams
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: logs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "logGroupName": "{{reader_log_group}}",
+    "orderBy": "LastEventTime",
+    "descending": true,
+    "limit": 1
+  }
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+  const streams = res.getBody().logStreams || [];
+  test("the reader has a log stream", function(){ expect(streams.length).to.be.at.least(1); });
+  if (streams.length) bru.setVar("reader_log_stream", streams[0].logStreamName);
+}

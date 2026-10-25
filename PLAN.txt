@@ -42,5 +42,5 @@ NEXT QUEUE (2026-10-25, not yet built)
 - One file for agents: AGENTS.md at the repo root with the whole picture; CLAUDE.md just points to it.
 - Monitoring built by Terraform: container metrics, a dashboard, alarms (apps down, storage credits low, NAT errors, backup failures), alerts to your email.
 - A 2.5D/3D map of the live sefs infrastructure, built serverless so it costs almost nothing when idle: hover for live health, click a resource to open its "room" and see its internals. Open question: who is allowed to see it (login, signed requests only, or an unlisted address).
-- Costs: per-minute and per-hour recomputed for the final stack, plus a 30-day figure from real usage, shown in the map.
+- Costs: done for the rates (make cost, 2026-10-26: about 17 cents an hour, a third of a cent a minute, about 125 dollars for 30 days in Sydney). A 30-day figure from a real bill needs the stack to run for days first; showing it in the map is chunk 5.
 - Final proof: fresh clone to opening a room, then a "check" push, then a clean teardown.

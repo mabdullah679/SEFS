@@ -27,13 +27,20 @@ auth:awsv4 {
 body:json {
   {
     "logGroupName": "{{reader_log_group}}",
-    "filterPattern": ""READ "",
+    "filterPattern": "\"READ \"",
+    "startTime": {{since10m}},
     "limit": 100
   }
 }
 
 docs {
   Sampling note: FilterLogEvents returns up to 100 events per call; the comparison is over the overlap of the two samples, not the whole history. tests/live/e2e.sh does the exhaustive version.
+}
+
+script:pre-request {
+  // FilterLogEvents without startTime can return an empty first page with only a nextToken; pin the window.
+  bru.setVar("since10m", Date.now() - 10 * 60 * 1000);
+  bru.setVar("since30d", Date.now() - 30 * 24 * 60 * 60 * 1000);
 }
 
 tests {

@@ -4,14 +4,10 @@ meta {
   seq: 1
 }
 
-post {
-  url: https://ec2.{{awsRegion}}.amazonaws.com/
-  body: text
+get {
+  url: https://ec2.{{awsRegion}}.amazonaws.com/?Action=DescribeSecurityGroupRules&Version=2016-11-15&Filter.1.Name=group-id&Filter.1.Value.1={{efs_security_group_id}}
+  body: none
   auth: awsv4
-}
-
-headers {
-  Content-Type: application/x-www-form-urlencoded
 }
 
 auth:awsv4 {
@@ -23,16 +19,12 @@ auth:awsv4 {
   profileName: {{awsProfile}}
 }
 
-body:text {
-  Action=DescribeSecurityGroupRules&Version=2016-11-15&Filter.1.Name=group-id&Filter.1.Value.1={{efs_security_group_id}}
-}
-
 tests {
   test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
 
-  const xml = res.getBody();
+  const xml = String(res.getBody()).replace(/<tagSet>[\s\S]*?<\/tagSet>/g, ""); // tags nest <item>s that would end the rule <item> early
   const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1]);
-  const tag = (s, t) => { const m = new RegExp("<" + t + ">([^<]*)</" + t + ">").exec(s); return m ? m[1] : null; };
+  const tag = (s, t) => { const parts = s.split("<" + t + ">"); return parts.length > 1 ? parts[1].split("<")[0] : null; };
   const rules = items.filter(i => tag(i, "securityGroupRuleId")).map(i => ({
     egress: tag(i, "isEgress") === "true", from: tag(i, "fromPort"), to: tag(i, "toPort"), proto: tag(i, "ipProtocol"),
     cidr: tag(i, "cidrIpv4"), cidr6: tag(i, "cidrIpv6"), ref: (/<referencedGroupInfo>[\s\S]*?<groupId>([^<]+)<\/groupId>/.exec(i) || [])[1] || null

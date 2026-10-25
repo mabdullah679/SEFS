@@ -105,7 +105,21 @@ Inputs: [variables.tf](variables.tf) (all with defaults; your values go in `acco
 
 ## Bruno collection (live, read-only, self-hydrating)
 
-[bruno/sefs](bruno/sefs) checks every requirement by calling the AWS APIs directly (SigV4). It holds **no credentials**: requests sign with the `sefs-bruno` profile, whose `credential_process` ([scripts/bruno-creds.sh](scripts/bruno-creds.sh)) assumes the least-privilege role `sefs-bruno-reader` ([modules/access](modules/access/main.tf)) through your own login. Folder `00-hydrate` reads every deployed ID from SSM; nothing is typed by hand. Folders: `01-storage` (R12 R13 R4 R15 R7 R10 R2/R3), `02-network` (R9 R8), `03-compute` (R6 R8 R3 R2), `04-backup` (R14), `05-behaviour` (WROTE/READ lines, write probe). Not in Bruno: the AWS-managed-key alias check and the IAM mutation; `make verify` and `make e2e` cover those.
+[bruno/sefs](bruno/sefs) checks every requirement by calling the AWS APIs directly (SigV4). It holds **no credentials**: requests sign with the `sefs-bruno` profile, whose `credential_process` ([scripts/bruno-creds.sh](scripts/bruno-creds.sh)) assumes the least-privilege role `sefs-bruno-reader` ([modules/access](modules/access/main.tf)) through your own login. Folder `00-hydrate` reads every deployed ID from SSM; nothing is typed by hand. Folders: `01-storage` (R12 R13 R4 R15 R7 R10 R2/R3), `02-network` (R9 R8), `03-compute` (R6 R8 R3 R2), `04-backup` (R14), `05-behaviour` (WROTE/READ lines over the last 10 minutes; the write probe read from the head of the reader's current log stream, because CloudWatch answers wide `FilterLogEvents` windows with an empty first page). Not in Bruno: the AWS-managed-key alias check and the IAM mutation; `make verify` and `make e2e` cover those. `bru run` must start inside `bruno/sefs`; `make bruno` does that.
+
+## Running cost
+
+`make cost` fetches today's rates from the AWS Pricing API for your region ([scripts/cost.py](scripts/cost.py)); quantities mirror the Terraform code. Measured for `ap-southeast-2` on 2026-10-26 (published rates, not an invoice):
+
+| Item | $/hour |
+|---|---|
+| 2 NAT gateways + their public IPv4 | 0.128 |
+| Fargate ARM (0.75 vCPU, 1.5 GB) | 0.036 |
+| 10 alarms + Container Insights metrics | 0.010 |
+| EFS, logs, ECR, backup storage at proof volumes | 0.001 |
+| **Total** | **0.174 per hour · 0.0029 per minute · 125.23 per 30 days** |
+
+Three quarters of it is the two NAT gateways; `nat_per_az = false` halves that line. Not metered: VPC, security groups, IAM, SNS at this volume, SSM, the state bucket and lock table (cents), NAT data processing (image pulls ≈ 0.5 GB per fresh deploy), GitHub Actions minutes (free for public repos). A 30-day figure from Cost Explorer actuals needs a stack that has run for days; this one has not, so the 30-day number above is rate × 720 h.
 
 ## Tests
 
@@ -128,6 +142,7 @@ make test-setup      # setup.sh with a fake aws: a secret never touches argv or 
 | Live verifier self-test | 29/29 scenarios (stub AWS) |
 | Live (`ap-southeast-2`, 2026-10-25) | `make up` 55 resources ≈ 8 min; `make verify` 15/15 + zero drift; e2e E1–E4 pass (40 files round-tripped; reader denied with `readOnly=false`; 46 files survived destroy/re-apply); `make down` clean, account re-checked independently |
 | GitHub Actions `check` (run 40216156247) | OIDC → shared state → full apply → zero drift → verify **16/16** incl. observability; deploy job 1 m 47 s |
+| Bruno (live, 2026-10-26, against the CI-deployed stack) | 20 requests, **58/58** tests under the `sefs-bruno-reader` role; negative control with bogus security-group IDs fails R9 and the group-exists check, as it should |
 
 **Not established:** the errno EFS returns for a denied write is undocumented (observed `EROFS`); no backup job has been observed completing (R14 is proven as configuration); no writer-role control run for the IAM mutation. Mapping: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 

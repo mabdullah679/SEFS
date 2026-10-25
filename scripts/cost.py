@@ -79,8 +79,8 @@ class StackCost:
             Line(f"Public IPv4 on NATs x{self.nat}", self.nat * r("AmazonVPC", f"{pf}-PublicIPv4:InUseAddress"), "per address-hour"),
             Line("Fargate ARM vCPU (0.25 writer + 0.5 reader)", 0.75 * r("AmazonECS", f"{pf}-Fargate-ARM-vCPU-Hours"), "per vCPU-hour"),
             Line("Fargate ARM memory (0.5 + 1.0 GB)", 1.5 * r("AmazonECS", f"{pf}-Fargate-ARM-GB-Hours"), "per GB-hour"),
-            Line("CloudWatch alarms x10", 10 * r("AmazonCloudWatch", f"{pf}-AlarmMonitorUsage") / HOURS_30D, "per alarm-month"),
-            Line("Container Insights metrics (~2 services x 10 metrics)", 20 * r("AmazonCloudWatch", f"{pf}-MetricMonitorUsage") / HOURS_30D, "per metric-month (estimate of metric count)"),
+            Line("CloudWatch alarms x10", 10 * r("AmazonCloudWatch", f"{pf}-CW:AlarmMonitorUsage", "Alarms") / HOURS_30D, "per alarm-month"),
+            Line("Container Insights metrics (~2 services x 10 metrics)", 20 * r("AmazonCloudWatch", f"{pf}-CW:MetricMonitorUsage", "Metrics") / HOURS_30D, "per metric-month (estimate of metric count)"),
         ]
         usage = [
             Line(f"EFS standard storage {self.efs_gb} GB", self.efs_gb * r("AmazonEFS", f"{pf}-TimedStorage-ByteHrs") / HOURS_30D, "per GB-month"),
