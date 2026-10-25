@@ -20,6 +20,7 @@ Settled decisions, newest last. Each says who decided, when, and what the obviou
 | D14 | 2026-10-25 | lead | Teardown: `state rm` the EFS → `terraform destroy` → delete the EFS via CLI → tag sweep; gated by `CONFIRM_DESTROY_DATA=yes` | Variable-driven `prevent_destroy`: Terraform requires a literal there, by design |
 | D15 | 2026-10-25 | lead | Task roles use `name_prefix` | Fixed names: a replaced role keeps its ARN, the FS policy doesn't update, and AWS's stored principal ID goes stale, locking the role out of the EFS |
 | D16 | 2026-10-25 | lead | Network: `az_count` capped at 8 (subnet slicing), and public subnets don't auto-assign public IPs | Uncapped: subnets would overlap above 8 AZs. Public IPs: nothing needs them; the NATs use their own EIPs |
+| D17 | 2026-10-25 | owner | Live proof runs in account **445137568806 ("production")**, region **ap-southeast-2**, after the lead flagged it is the prod-named account | The "Costs and Credits" account (346208529954): owner chose the current session. Isolation: own VPC, all resources tagged `Project=sefs`, teardown deletes only Terraform-tracked + tagged resources |
 
 ## Spec drift: "read-only" on an access point
 
