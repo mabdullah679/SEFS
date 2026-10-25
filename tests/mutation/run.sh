@@ -82,6 +82,14 @@ m26 ::: R10 ::: modules/efs/main.tf ::: sub ::: uid = var.reader_uid ::: uid = v
 m27 ::: R13 ::: modules/efs/main.tf ::: sub ::: kms_key_id = var.kms_key_arn ::: kms_key_id = null ::: tests/unit/apply/efs_wiring.tftest.hcl::r13_cmk_passed_through
 m28 ::: R3 ::: modules/efs/main.tf ::: sub ::: policy         = module.fs_policy.json ::: policy         = jsonencode({ Version = "2012-10-17", Statement = [] }) ::: tests/unit/apply/efs_wiring.tftest.hcl::r03_fs_policy_attached_to_shared_fs
 m29 ::: CTR ::: modules/efs/main.tf ::: sub ::: status = "DISABLED" ::: status = "ENABLED" ::: tests/unit/efs.tftest.hcl::efs_automatic_backups_disabled
+m30 ::: BRU ::: modules/access/main.tf ::: sub ::: Action = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"] ::: Action = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath", "ssm:PutParameter"] ::: tests/unit/access.tftest.hcl::access_read_only_actions_only
+m31 ::: BRU ::: modules/access/main.tf ::: sub ::: "${local.ssm_param_arn}/${var.name}/*", ::: "*", ::: tests/unit/access.tftest.hcl::access_ssm_scoped_to_project_paths
+m32 ::: BRU ::: modules/access/main.tf ::: sub ::: StringEquals = { "kms:ViaService" = "ssm.${var.region}.amazonaws.com" } ::: StringEquals = {} ::: tests/unit/access.tftest.hcl::access_kms_decrypt_only_via_ssm
+m33 ::: BRU ::: modules/access/main.tf ::: sub ::: ["${local.arn}:iam::${local.account}:root"] ::: ["*"] ::: tests/unit/access.tftest.hcl::access_trust_defaults_to_this_account_only
+m34 ::: BRU ::: modules/access/variables.tf ::: sub ::: length(var.name) <= 25 ::: length(var.name) <= 64 ::: tests/unit/access.tftest.hcl::access_rejects_overlong_name
+m35 ::: BRU ::: modules/registry/main.tf ::: sub ::: type        = "String" ::: type        = "SecureString" ::: tests/unit/access.tftest.hcl::registry_publishes_plain_string_params_under_prefix
+m36 ::: BRU ::: modules/access/main.tf ::: sub ::: Resource = ["${local.arn}:backup:${var.region}:${local.account}:backup-plan:*", "${local.arn}:backup:${var.region}:${local.account}:backup-vault:${var.name}*"] ::: Resource = "*" ::: tests/unit/access.tftest.hcl::access_wildcard_resource_only_for_unscopable_describes
+m37 ::: BRU ::: modules/access/main.tf ::: sub ::: max_session_duration = 3600 ::: max_session_duration = 43200 ::: tests/unit/access.tftest.hcl::access_trust_defaults_to_this_account_only
 EOF
 
 # Apply one mutation in place to $1 (a temp copy). Prints nothing on success.

@@ -100,3 +100,16 @@ Collaboration without overwriting = **hard file ownership + contracts first + on
 - **Q2: Monolith vs decoupled** — **DECIDED 2026-10-25: decoupled stacks (network / storage / apps, separate state).**
 - **Q3: Fleet** — owner approved 2026-10-25 with changes: tests on both mock and real AWS; ro-access-point drift documented with compensating control; destroy right after proof; Q2 reversed to mother-orchestrates-children (see below).
 - **Q2 REVISED 2026-10-25:** one **mother Terraform** orchestrates **child** Terraform. Docs map every component to the child that updates it, so a single-component update has a known command. Larger deployments: docs explain mother-child; use the mother file or go granular, user's choice.
+
+## 7. Queue — final vision (owner, 2026-10-25; intent restated, not yet built)
+
+> One script, enter credentials once, platform provisioned. Then test per child or full mother deploy. CI detects which children changed and redeploys only those. After one-time setup, pushing to `main` with the keyword **"check"** handles everything.
+
+| # | Item | State 2026-10-25 |
+|---|---|---|
+| Q1 | `setup.sh`: fresh-clone checks (tools, Docker, AWS identity), prompts for creds → SSM SecureString only, writes `account.auto.tfvars`, runs `make up` | not started |
+| Q2 | Bruno collection, self-hydrating from SSM via the read-only role. `modules/access` + `modules/registry` built, unit-tested (31/31), **not live-proven**; mutations m30–m37 added, run pending | collection not started |
+| Q3 | CI: push to `main` with "check" in the commit message → detect changed children (path → `module.<child>`), plan+apply only those, else full mother; verify after | not started; CI host to decide (GitHub Actions is the natural fit for a cloned client repo) |
+| Q4 | Mutation-prove everything above as it lands | pending |
+
+Usage rule (owner, 2026-10-25): owner gates on `/usage`; small stoppable chunks; no agent fan-out without an explicit go.
