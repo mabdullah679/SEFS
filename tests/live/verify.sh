@@ -61,13 +61,14 @@ fetch() { local __v="$1"; shift; local out; out="$(a "$@")" || out=""; printf -v
 # ---------------------------------------------------------------- inputs
 OUT="$("$TF" output -json 2>>"$ERRLOG")" || { echo "${YEL}UNVERIFIED${RST} ALL  terraform output -json failed (no state?)"; cat "$ERRLOG"; exit 3; }
 o() { jq -r --arg k "$1" '.[$k].value // empty | if type=="array" then join(" ") else . end' <<<"$OUT"; }
-tfvar() { echo "$1" | "$TF" console 2>/dev/null | tr -d '"' ; }
+# TF 1.9 console prints a null string var as `tostring(null)`, not `null`; normalise every form to "".
+tfvar() { echo "$1" | "$TF" console 2>/dev/null | tr -d '"' | sed -E 's/^(to[a-z]+\()?null\)?$//' ; }
 
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
 [ -n "$REGION" ] || REGION="$(tfvar var.region)"
 [ -n "$REGION" ] || { echo "${YEL}UNVERIFIED${RST} ALL  could not determine region"; exit 3; }
 NAME="$(tfvar var.name)"; NAME="${NAME:-sefs}"
-KMS_VAR="$(tfvar var.kms_key_arn)"; [ "$KMS_VAR" = "null" ] && KMS_VAR=""
+KMS_VAR="$(tfvar var.kms_key_arn)"
 EXPECT_AZ="$(tfvar var.az_count)"
 
 VPC_ID="$(o vpc_id)"; PRIV="$(o private_subnet_ids)"
