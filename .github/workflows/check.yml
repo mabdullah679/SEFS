@@ -30,8 +30,7 @@ jobs:
         with: { terraform_version: "1.9.8", terraform_wrapper: false }
       - run: bash tests/unit/run.sh
       - run: bash tests/ci/selftest.sh
-      - run: bash tests/setup/selftest.sh
-        if: false   # needs `expect`; enabled once the runner image is confirmed to have it
+      - run: sudo apt-get install -y -q expect >/dev/null && bash tests/setup/selftest.sh
 
   deploy:
     name: apply changed children + verify

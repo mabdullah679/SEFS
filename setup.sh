@@ -73,8 +73,12 @@ echo "== 3/6 local config (git-ignored)"
 if [ -f account.auto.tfvars ] && ! grep -q "\"$acct\"" account.auto.tfvars; then
   warn "account.auto.tfvars points at a different account; replacing it"
 fi
+alert_email="$(ask "Email for alarm notifications (blank = none; you confirm the SNS subscription mail once):")"
 umask 077
-printf 'allowed_account_id = "%s"\nregion             = "%s"\n' "$acct" "$region" > account.auto.tfvars
+{
+  printf 'allowed_account_id = "%s"\nregion             = "%s"\n' "$acct" "$region"
+  [ -n "$alert_email" ] && printf 'alert_email        = "%s"\n' "$alert_email"
+} > account.auto.tfvars
 git check-ignore -q account.auto.tfvars || die "account.auto.tfvars is NOT git-ignored; refusing to continue"
 ok "account.auto.tfvars written (allowed_account_id=$acct, region=$region)"
 

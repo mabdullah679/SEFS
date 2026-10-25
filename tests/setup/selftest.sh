@@ -24,7 +24,8 @@ cat > "$W/bin/aws" <<'EOF'
 printf '%s\n' "$*" >> "$FAKE_LOG.argv"
 case "$1 $2" in
   "sts get-caller-identity") echo '{"Account":"111122223333","Arn":"arn:aws:sts::111122223333:assumed-role/T/x","UserId":"X"}' ;;
-  "configure get") echo "eu-west-1" ;;
+  "configure get") case "${3:-}" in region) echo "eu-west-1" ;; *) exit 1 ;; esac ;;   # no login_session => plain profile
+  "configure set") : ;;
   "ec2 describe-availability-zones") echo 3 ;;
   "ssm get-parameter") exit 255 ;;              # not stored yet
   "ssm put-parameter") cat > "$FAKE_LOG.put-stdin" ;;
@@ -53,6 +54,8 @@ rm -f "$FAKE_LOG".*
   spawn ./setup.sh --no-deploy
   expect \"THIS account\" { send \"y\r\" }
   expect \"Region\"       { send \"\r\" }
+  expect \"Email for alarm\" { send \"ops@example.com\r\" }
+  expect \"GitHub repo\"    { send \"\r\" }
   expect \"api_key\"      { send \"$SECRET\r\" }
   expect eof
 " ) >"$W/out" 2>&1 || true
@@ -62,7 +65,7 @@ if [ -f "$FAKE_LOG.put-stdin" ] && jq -e --arg v "$SECRET" '.Value==$v and .Type
   pass "S2 put-parameter got the value on stdin as SecureString under /sefs/secrets/"
 else bad "S2 put-parameter stdin wrong or missing: $(cat "$FAKE_LOG.put-stdin" 2>/dev/null | jq -c 'del(.Value)' 2>/dev/null)"; fi
 changed="$(git -C "$W/repo" status --porcelain --ignored | grep -v '^!! .terraform' | awk '{print $2}' | sort | tr '\n' ' ')"
-if [ "$changed" = "account.auto.tfvars " ] && grep -q 'allowed_account_id = "111122223333"' "$W/repo/account.auto.tfvars" && grep -q 'region             = "eu-west-1"' "$W/repo/account.auto.tfvars"; then
+if [ "$changed" = "account.auto.tfvars " ] && grep -q 'allowed_account_id = "111122223333"' "$W/repo/account.auto.tfvars" && grep -q 'region             = "eu-west-1"' "$W/repo/account.auto.tfvars" && grep -q 'alert_email        = "ops@example.com"' "$W/repo/account.auto.tfvars"; then
   pass "S3 only account.auto.tfvars written, with the confirmed account + region"
 else bad "S3 unexpected files or content: [$changed]"; fi
 if grep -rq "$SECRET" "$W/repo"; then bad "S4 secret found on disk in the repo copy"; else pass "S4 secret in no repo file"; fi

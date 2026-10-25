@@ -29,6 +29,7 @@ Settled decisions, newest last. Each says who decided, when, and what the obviou
 | D23 | 2026-10-25 | owner | The 2.5D GUI is a **sidewagon**: a separate, optional child (`enable_gui`, default on) so a client can tell their agent to skip it; serverless so idle cost is ≈ 0 | Mandatory GUI: bloats a stack whose core is storage; a Fargate-hosted GUI: compute billed while idle |
 | D24 | 2026-10-25 | owner | No large files in Git: `.gitignore` patterns for archives/binaries/media/3D assets **and** a pre-commit hook refusing files > 5 MB (owner keeps hitting the LFS quota). 3D models for the GUI are procedural (three.js primitives), not binary assets | Patterns alone: cannot anticipate every binary |
 | D25 | 2026-10-25 | owner | GUI access = **Cognito user pool** login in front of the page and the API; `setup.sh` creates the first user; no AWS credentials in the browser | Signed requests only: no browser login, needs a local signing helper. Unlisted URL: topology of the account readable by anyone with the link |
+| D26 | 2026-10-25 | owner | **Delivery model:** the public repo is the client's repo (apps + IaC + automation together). The client clones it into their own GitHub repo, supplies only their values (`account.auto.tfvars` via `setup.sh`, five GitHub repo variables), never edits code; chunk 5 ships as a pull their own `check` push deploys | A separate infra repo: splits the mother/child protocol from the apps whose images it builds, and doubles what the client must wire |
 
 ## Spec drift: "read-only" on an access point
 

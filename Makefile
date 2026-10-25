@@ -30,7 +30,7 @@ preflight: ## Check host tools and show which AWS account/region you're about to
 	@for t in $(TF) docker aws; do command -v $$t >/dev/null || { echo "MISSING: $$t"; exit 1; }; done
 	@docker info >/dev/null 2>&1 || { echo "Docker daemon not running"; exit 1; }
 	@aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output table
-	@echo "Region: $$($(TF) console <<< 'var.region' 2>/dev/null || echo us-east-1)"
+	@echo "Region: $$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars 2>/dev/null || true)"
 
 bootstrap: ## One-time per account+region: state bucket + lock table (+ GitHub deploy role if GITHUB_REPO=owner/repo); writes backend.hcl
 	cd bootstrap && $(TF) init -input=false >/dev/null && $(TF) apply $(APPROVE) \
