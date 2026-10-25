@@ -13,3 +13,5 @@ output "reader_service_name" { value = module.apps.reader_service_name }
 output "writer_log_group" { value = module.apps.writer_log_group }
 output "reader_log_group" { value = module.apps.reader_log_group }
 output "reader_task_definition_arn" { value = module.apps.reader_task_definition_arn }
+output "region" { value = var.region }
+output "name" { value = var.name }

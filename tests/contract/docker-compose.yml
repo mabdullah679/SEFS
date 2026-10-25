@@ -1,0 +1,53 @@
+# SEFS local POSIX contract test. Driven by run.sh; see README.md.
+# Everything here is prefixed sefs-contract (project, images, volume, containers).
+name: sefs-contract
+
+services:
+  # Stands in for the EFS access point creation_info: root dir owned 1001:1000, 0775.
+  init:
+    image: sefs-contract-writer:test
+    pull_policy: never
+    user: "0:0"
+    entrypoint: ["sh", "-c", "chown 1001:1000 /mnt/shared && chmod 0775 /mnt/shared"]
+    volumes:
+      - shared:/mnt/shared
+
+  writer:
+    build:
+      context: ../../apps/writer-python
+      platforms: ["linux/arm64"]
+    image: sefs-contract-writer:test
+    platform: linux/arm64
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      SHARED_DIR: /mnt/shared
+      WRITER_INTERVAL_SECONDS: "1"
+    volumes:
+      - type: volume
+        source: shared
+        target: /mnt/shared
+
+  reader:
+    build:
+      context: ../../apps/reader-springboot
+      platforms: ["linux/arm64"]
+    image: sefs-contract-reader:test
+    platform: linux/arm64
+    depends_on:
+      writer:
+        condition: service_started
+    environment:
+      SHARED_DIR: /mnt/shared
+      READER_POLL_SECONDS: "1"
+    volumes:
+      - type: volume
+        source: shared
+        target: /mnt/shared
+        read_only: true
+        volume:
+          nocopy: true
+
+volumes:
+  shared: {}
