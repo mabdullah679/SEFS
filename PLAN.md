@@ -1,0 +1,102 @@
+# SEFS — Implementation Plan (Shared EFS for Multi-App)
+
+Source: [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx) (full text extracted 2026-10-25; the 529 KB size is embedded fonts, there are no images or hidden sections).
+Status: **DRAFT — awaiting owner approval.** Nothing built, nothing provisioned.
+
+---
+
+## 1. Requirements, numbered (so every file and test can cite one)
+
+| ID | Requirement (from spec) | How it gets enforced (the code path, not prose) |
+|----|----|----|
+| R1 | EFS persists independently of app lifecycle | Storage lives in its own Terraform stack + state; destroying the apps stack cannot touch it |
+| R2 | Python writer has rw on the shared path | Writer task role gets `ClientMount`+`ClientWrite`; access point root dir; ECS volume `readOnly=false` |
+| R3 | Spring Boot reader has ro (or rw) on the **same** path | Reader task role gets `ClientMount` only; file-system policy denies write to anyone without `ClientWrite`; ECS mount `readOnly=true` |
+| R4 | EFS lifecycle isolated and/or `prevent_destroy = true` | Both: separate stack (R1) **and** `lifecycle { prevent_destroy = true }` on the file system |
+| R5 | Multi-AZ VPC, ≥2 AZs, public + private subnets | Network module; `length(azs) >= 2` variable validation |
+| R6 | Apps run in private subnets | Services pinned to private subnet IDs, `assign_public_ip = false` |
+| R7 | One mount target per private-subnet AZ | `aws_efs_mount_target` via `for_each` over private subnets |
+| R8 | `sg-apps` attached to both apps | Single SG output from apps stack, set on both services |
+| R9 | `sg-efs` allows 2049 inbound **only** from `sg-apps` | One ingress rule, `referenced_security_group_id = sg-apps`, no CIDR rules |
+| R10 | Access point enforces POSIX UID/GID | `aws_efs_access_point` with `posix_user` + `root_directory.creation_info` |
+| R11 | Modular Terraform | `modules/{network,efs,backup,apps}` consumed by `stacks/*` |
+| R12 | `encrypted=true`, `generalPurpose`, `bursting` | Hard-coded on the resource; variable validation rejects other values |
+| R13 | Encryption at rest, AWS-managed or CMK | `kms_key_arn` optional variable; null = `aws/elasticfilesystem` |
+| R14 | AWS Backup, ≥35-day retention | `aws_backup_vault` + `plan` + `selection` + IAM role; `delete_after` validated `>= 35` |
+| R15 | Transition to IA after 30 days | `lifecycle_policy { transition_to_ia = "AFTER_30_DAYS" }` |
+
+## 2. Gaps and traps in the spec (my calls — argue if you disagree)
+
+1. **SPEC DRIFT (honest caveat, goes in README + DECISIONS): "read-only" has no switch on an access point.** The spec implies `ro` can be set at the access point; it can't. Compensating solution below.
+    Access points set UID/GID and root path only. A ro reader enforced only by a mount flag is a control that is never code — the container can remount rw. Real enforcement = IAM authorization on the mount (needs transit encryption on) + file-system policy. R3 above is wired that way.
+2. **Same path + different runtimes = permission errors** (the exact thing R10 warns about). Plan: both access points use the same root dir (`/shared`) and the same GID (e.g. 1000), writer UID 1001, reader UID 1002, dir perms `0775`, files created group-readable. Writer and reader then can't fight over ownership.
+3. **Transit encryption isn't in the spec** but is required for IAM-authorized mounts (point 1). Adding it.
+4. **Apps aren't supplied.** The spec names a Python writer and a Spring Boot reader but provides neither. A minimal pair is in scope, because without them R2/R3 can't be proven end to end.
+5. **ALB is mentioned in the diagram but nothing needs it** (the reader processes files; no inbound HTTP is required). Leaving it out; noting as future work.
+6. **NAT gateways.** Owner doesn't care about hourly rate (2026-10-25), so one NAT per AZ, matching the spec diagram.
+7. **Spec's two open questions** (compute service, monolith vs decoupled) are the blockers below.
+
+## 3. Target layout (mother root + child modules, ONE state — decided 2026-10-25)
+
+```
+SEFS/
+  main.tf, variables.tf, outputs.tf, versions.tf   MOTHER: wires every child; one apply deploys all
+  modules/network/    VPC, 2+ AZ public/private subnets, IGW, NAT per AZ, routes
+  modules/security/   sg-apps, sg-efs (2049 from sg-apps only)
+  modules/efs/        file system, mount targets, access points, FS policy, lifecycle, prevent_destroy
+  modules/backup/     vault, 35-day plan, selection, IAM role
+  modules/images/     ECR repos + image build/push inside the apply (ARM64, native on M1)
+  modules/apps/       ECS cluster, task defs w/ EFS volumes, task roles, services, logs
+  apps/writer-python/       minimal writer + Dockerfile
+  apps/reader-springboot/   minimal reader + Dockerfile (multi-stage; host needs no Java)
+  tests/unit/         terraform test, mock providers (fake AWS)
+  tests/mutation/     mutation harness
+  tests/contract/     docker-compose writer/reader POSIX test
+  tests/live/         real-AWS verifier + end-to-end script
+  Makefile            up / test / verify / down
+  docs/               CONTRACTS, DECISIONS, TRACEABILITY, COMPONENTS (which child updates what)
+  README.md + README.txt
+```
+
+Single-component update = `terraform apply -target=module.<child>`; the component → child map lives in `docs/COMPONENTS.md`.
+Images are built and pushed inside the apply, so one `terraform apply` should deploy everything. `make up` wraps it (preflight checks + apply). If a non-Terraform step proves unavoidable, it moves into `make up` and gets documented.
+
+**Two honest constraints this layout creates:**
+- `terraform test` in apply mode on real AWS auto-destroys what it created, which `prevent_destroy` blocks for the EFS. So the real-AWS layer is: `make up` → a verifier that checks every R-ID against live AWS (`aws efs describe-*` etc.) → `terraform plan` must show **no changes** (declared = live) → behavior e2e.
+- Teardown: `prevent_destroy` can't be toggled by a variable (Terraform requires a literal). `make down` is a deliberate two-step: `terraform state rm` the file system, `terraform destroy` the rest, then delete the EFS via the AWS CLI. Gated by `CONFIRM_DESTROY_DATA=yes` and verified against AWS. EFS automatic backups (`aws_efs_backup_policy`) stay DISABLED so no untracked default vault is left behind; our own Backup plan covers R14.
+
+## 4. How it gets proven (free/local first)
+
+| Layer | Proof | Needs AWS? |
+|----|----|----|
+| Every R-ID in Terraform | `terraform test` with `mock_provider` (TF 1.9.8 installed) asserting each attribute; `terraform validate`; `tflint`; `checkov` | No |
+| Each guard is real | Mutation run: flip the guard (e.g. `encrypted=false`, retention 34, add a CIDR to sg-efs, drop `prevent_destroy`) and watch the matching test go red, then reverse the exact edit | No |
+| Writer/reader POSIX contract | docker-compose: shared volume, writer as 1001:1000, reader as 1002:1000 with ro mount; reader reads what writer wrote; reader write attempt fails | No |
+| Terraform on real AWS | `terraform test` run against the live account (real provider, not mocks), same assertions | **Yes** |
+| Real EFS end to end | ONE command (`make up`) deploys everything; writer writes, reader reads, reader write is denied; **IAM mutation on real AWS**: run a reader-role task with the mount flag set rw and confirm writes are still denied (proves the compensating control, not just the flag); apps destroyed and re-applied, data still there (R1); then `make down` and teardown verified against AWS | **Yes** |
+
+**Single-command spin-up (owner, 2026-10-25):** proof target is that one `terraform apply`, or one `make` target if infra isn't the only spin-up step, deploys the entire thing. My call: **Makefile**, because container images must be built and pushed to ECR before ECS can start tasks. `make up` = build/push images + mother `terraform apply`.
+
+floci (local AWS emulator) is not running here (container not found 2026-10-25), and whether it emulates EFS/Backup is **unverified**. If you want it tried, it's a 5-minute probe; the plan doesn't depend on it. Fallback (owner, 2026-10-25): if floci can't do EFS, owner will auth into an AWS account with credits for the live layer. Credits don't waive the consent gate below.
+
+**Live AWS gate:** before any apply I show account ID/name, region and resource list and wait for a yes. Owner: hourly rate not a concern; everything is destroyed as soon as the single-command deploy is proven. Teardown note: `prevent_destroy` means final cleanup needs a deliberate override, which I'd do and verify the same session.
+
+## 5. Agent fleet (approved 2026-10-25)
+
+Collaboration without overwriting = **hard file ownership + contracts first + one git worktree per agent.**
+
+0. **Lead (me):** `git init`, scaffold, `docs/CONTRACTS.md` (every child's variables/outputs, names fixed), mother root files, Makefile. Nobody edits a path they don't own; contract changes go through me.
+1. **Network** — `modules/network`. R5, R6.
+2. **Storage** — `modules/security`, `modules/efs`. R3 (FS policy), R4, R7, R9, R10, R12, R13, R15.
+3. **Backup** — `modules/backup`. R14.
+4. **Compute** — `modules/apps`. R2, R3 (mount + roles), R6, R8.
+5. **Apps** — `apps/*`, `modules/images`, `tests/contract`. Writer, reader, image build, POSIX test.
+6. **Verification** — `tests/unit`, `tests/mutation`, `tests/live`, `docs/TRACEABILITY.md`.
+7. **Lead integrates:** merge order network → storage/backup → compute → apps → tests; run every proof; README.md/.txt (golden shape), `docs/DECISIONS.md`, `docs/COMPONENTS.md`. Then the AWS gate.
+
+## 6. Blocking decisions (asked one at a time)
+
+- **Q1: Compute service** — **DECIDED 2026-10-25: ECS Fargate.**
+- **Q2: Monolith vs decoupled** — **DECIDED 2026-10-25: decoupled stacks (network / storage / apps, separate state).**
+- **Q3: Fleet** — owner approved 2026-10-25 with changes: tests on both mock and real AWS; ro-access-point drift documented with compensating control; destroy right after proof; Q2 reversed to mother-orchestrates-children (see below).
+- **Q2 REVISED 2026-10-25:** one **mother Terraform** orchestrates **child** Terraform. Docs map every component to the child that updates it, so a single-component update has a known command. Larger deployments: docs explain mother-child; use the mother file or go granular, user's choice.

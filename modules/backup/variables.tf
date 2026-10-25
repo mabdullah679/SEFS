@@ -1,0 +1,23 @@
+# CONTRACT FILE (docs/CONTRACTS.md). Names and types are fixed by the lead; do not rename/remove/add without lead approval.
+
+variable "name" {
+  description = "Name prefix."
+  type        = string
+}
+
+variable "resource_arns" {
+  description = "ARNs to back up (the EFS)."
+  type        = list(string)
+}
+
+variable "retention_days" {
+  description = "Retention; MUST validate >= 35 (R14)."
+  type        = number
+}
+
+variable "kms_key_arn" {
+  description = "CMK for vault or null."
+  type        = string
+  default     = null
+}
+

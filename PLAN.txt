@@ -1,0 +1,39 @@
+SEFS PLAN - PLAIN VERSION (twin of PLAN.md, updated 2026-10-25)
+Status: approved, build starting. Nothing in AWS yet. AWS gets touched only after you say yes to the account, region and resource list.
+
+WHAT THE SPEC ASKS FOR
+One shared AWS file system (EFS) that a Python app writes files to and a Spring Boot app reads from, built with Terraform.
+It has to: survive the apps being destroyed; be encrypted; run across 2+ data centers (AZs) in private subnets; only accept traffic from the apps; force fixed Linux user/group IDs so the two apps don't hit permission errors; be backed up for 35+ days; move old files to cheaper storage after 30 days.
+I numbered these as R1 to R15 so every file and test can point to the one it covers.
+
+DECISIONS YOU MADE
+- The apps run on ECS Fargate.
+- One "mother" Terraform deploys everything by calling "child" pieces (network, firewall, storage, backup, images, apps). They share one state file.
+- To update one piece, there's a known command for that child alone, and a doc lists which child owns which component. Big deployments can use the mother file or go child by child.
+- Cost per hour doesn't matter. We destroy everything as soon as one command is proven to deploy it all.
+
+WHERE WE DRIFT FROM THE SPEC, AND HOW WE MAKE UP FOR IT
+1. The spec suggests an EFS access point can make the reader read-only. It can't, because access points only set the user, group and folder. A read-only flag on the container alone isn't real protection, since it can be switched off. Our fix is real enforcement: AWS checks permissions every time the reader mounts, and a policy on the file system blocks the reader from writing. We prove it on real AWS by running the reader with the read-only flag switched off and confirming writes are still blocked.
+2. Two apps on one folder usually means permission errors. Both apps share group 1000, the writer is user 1001, the reader is user 1002, and the folder is group-readable.
+3. The permission check needs encryption in transit, which the spec leaves out. Adding it.
+4. The spec doesn't include the two apps. We build a small writer and reader so the rules can be proven.
+5. The diagram shows a load balancer but nothing needs one. Left out and listed as future work.
+6. Terraform's built-in test tool deletes everything it creates when it finishes, and the storage's delete protection blocks that. So on real AWS we test differently: deploy for real, check every requirement against what AWS reports, confirm Terraform sees no difference between the code and what's running, then run the write/read test.
+7. The delete protection can't be switched off with a setting, which is by design. Teardown is a deliberate two-step: remove the storage from Terraform's tracking, delete everything else, then delete the storage directly. It only runs if you type a confirmation, and afterwards I check AWS to make sure nothing is left.
+8. EFS's own automatic backups stay off, so no backup vault is left that Terraform doesn't know about. Our own 35-day backup plan covers the requirement.
+
+HOW IT GETS PROVEN
+- Fake AWS: Terraform tests on mocked AWS check every requirement. Free and local.
+- Mutation pass: break each rule on purpose and confirm a test catches it, then undo the exact change.
+- Docker test: writer and reader share a folder as different users. The reader reads what the writer wrote, and a write attempt by the reader fails.
+- Real AWS: one command (make up) builds the app images and deploys everything. Then: check every requirement against AWS, confirm Terraform reports no changes, the writer writes, the reader reads, the reader can't write even with the flag off, delete the apps and bring them back with the data still there, then tear it all down and confirm with AWS that it's gone.
+
+THE AGENT TEAM
+I set up first: git repo, a contract that fixes every piece's inputs and outputs by name, the mother Terraform, and the Makefile. Each agent then works only in its own folders on its own branch, so nobody overwrites anyone.
+1 Network: VPC, subnets, NAT.
+2 Storage: firewall rules, the file system, mount points, access points, storage policy, cheaper-storage rule, delete protection.
+3 Backup: 35-day backups.
+4 Compute: the ECS cluster and the two apps with the right permissions.
+5 Apps: the Python writer, the Spring Boot reader, building the images, and the Docker test.
+6 Verification: fake-AWS tests, the mutation pass, the real-AWS checker, and the requirement-to-test map.
+Then I merge in order, run every proof, and write the README (markdown and plain text), the decisions log, and the component-to-child map.

@@ -1,0 +1,15 @@
+output "vpc_id" { value = module.network.vpc_id }
+output "private_subnet_ids" { value = module.network.private_subnet_ids }
+output "apps_security_group_id" { value = module.security.apps_security_group_id }
+output "efs_security_group_id" { value = module.security.efs_security_group_id }
+output "file_system_id" { value = module.efs.file_system_id }
+output "writer_access_point_id" { value = module.efs.writer_access_point_id }
+output "reader_access_point_id" { value = module.efs.reader_access_point_id }
+output "backup_vault_name" { value = module.backup.vault_name }
+output "backup_plan_id" { value = module.backup.plan_id }
+output "cluster_name" { value = module.apps.cluster_name }
+output "writer_service_name" { value = module.apps.writer_service_name }
+output "reader_service_name" { value = module.apps.reader_service_name }
+output "writer_log_group" { value = module.apps.writer_log_group }
+output "reader_log_group" { value = module.apps.reader_log_group }
+output "reader_task_definition_arn" { value = module.apps.reader_task_definition_arn }
