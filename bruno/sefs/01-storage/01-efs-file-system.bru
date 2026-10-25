@@ -1,0 +1,36 @@
+meta {
+  name: R12 R13 R4 — DescribeFileSystems
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://elasticfilesystem.{{awsRegion}}.amazonaws.com/2015-02-01/file-systems?FileSystemId={{file_system_id}}
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: elasticfilesystem
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const fs = res.getBody().FileSystems[0];
+  test("R12: encrypted, generalPurpose, bursting", function(){
+    expect(fs.Encrypted).to.equal(true);
+    expect(fs.PerformanceMode).to.equal("generalPurpose");
+    expect(fs.ThroughputMode).to.equal("bursting");
+  });
+  test("R13: a KMS key is attached (alias check needs kms:ListAliases; verify.sh covers it)", function(){
+    expect(fs.KmsKeyId).to.match(/^arn:[a-z-]+:kms:/);
+  });
+  test("R4: file system is available", function(){ expect(fs.LifeCycleState).to.equal("available"); });
+  bru.setVar("file_system_arn", fs.FileSystemArn);
+}

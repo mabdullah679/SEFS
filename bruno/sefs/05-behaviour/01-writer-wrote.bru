@@ -1,0 +1,42 @@
+meta {
+  name: R2 — writer logs WROTE lines
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://logs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: Logs_20140328.FilterLogEvents
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: logs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "logGroupName": "{{writer_log_group}}",
+    "filterPattern": ""WROTE "",
+    "limit": 100
+  }
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const ev = res.getBody().events.map(e => e.message);
+  const wrote = ev.filter(m => /^WROTE \S+ sha256=[0-9a-f]{64}$/.test(m));
+  test("R2: the writer has written files (WROTE <file> sha256=<hex>)", function(){ expect(wrote.length).to.be.at.least(1); });
+  bru.setVar("wrote_lines", JSON.stringify(wrote.map(m => m.slice(6))));
+}

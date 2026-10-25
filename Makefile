@@ -5,7 +5,7 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help setup test-setup preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
+.PHONY: help setup test-setup bruno-profile bruno preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -48,6 +48,13 @@ test-mutation: ## Break each guard in a temp copy; every mutation must be caught
 
 test-contract: ## Writer/reader POSIX + ro contract in local Docker
 	bash tests/contract/run.sh
+
+bruno-profile: ## Install the credential-free 'sefs-bruno' AWS profile: make bruno-profile SOURCE=<your login profile>
+	@test -n "$(SOURCE)" || { echo "usage: make bruno-profile SOURCE=<your AWS login profile>"; exit 1; }
+	bash scripts/bruno-profile.sh install "$(SOURCE)" "$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
+
+bruno: ## Run the self-hydrating Bruno collection against the live deployment (read-only role)
+	bru run bruno/sefs --env aws --env-var awsRegion="$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
 
 verify: ## Real AWS: every R-ID checked against live state + plan shows no drift
 	bash tests/live/verify.sh

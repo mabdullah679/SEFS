@@ -1,0 +1,41 @@
+meta {
+  name: R10 R2 R3 — DescribeAccessPoints
+  type: http
+  seq: 4
+}
+
+get {
+  url: https://elasticfilesystem.{{awsRegion}}.amazonaws.com/2015-02-01/access-points?FileSystemId={{file_system_id}}
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: elasticfilesystem
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const aps = res.getBody().AccessPoints;
+  const w = aps.find(a => a.AccessPointId === bru.getVar("writer_access_point_id"));
+  const r = aps.find(a => a.AccessPointId === bru.getVar("reader_access_point_id"));
+  test("both access points exist", function(){ expect(w).to.exist; expect(r).to.exist; });
+  test("R2/R3: same root path for writer and reader", function(){
+    expect(w.RootDirectory.Path).to.equal(r.RootDirectory.Path);
+  });
+  test("R10: POSIX identity forced: writer 1001:1000, reader 1002:1000, dir 0775 owned 1001:1000", function(){
+    expect(w.PosixUser).to.deep.include({ Uid: 1001, Gid: 1000 });
+    expect(r.PosixUser).to.deep.include({ Uid: 1002, Gid: 1000 });
+    for (const a of [w, r]) {
+      expect(a.RootDirectory.CreationInfo).to.deep.include({ OwnerUid: 1001, OwnerGid: 1000, Permissions: "0775" });
+    }
+  });
+  bru.setVar("writer_access_point_arn", w.AccessPointArn);
+  bru.setVar("reader_access_point_arn", r.AccessPointArn);
+}

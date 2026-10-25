@@ -1,0 +1,47 @@
+meta {
+  name: R3 — reader's own write probe was DENIED (mount flag)
+  type: http
+  seq: 3
+}
+
+post {
+  url: https://logs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: Logs_20140328.FilterLogEvents
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: logs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "logGroupName": "{{reader_log_group}}",
+    "filterPattern": ""WRITE_PROBE"",
+    "limit": 100
+  }
+}
+
+docs {
+  This proves the readOnly mount flag only. The IAM control (write denied even with the flag off) is proven by tests/live/e2e.sh step E3; Bruno cannot run an ECS task with the read-only role.
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const ev = res.getBody().events.map(e => e.message);
+  test("reader logged WRITE_PROBE DENIED and never ALLOWED", function(){
+    expect(ev.some(m => /^WRITE_PROBE DENIED /.test(m))).to.equal(true);
+    expect(ev.some(m => /^WRITE_PROBE ALLOWED/.test(m))).to.equal(false);
+  });
+}

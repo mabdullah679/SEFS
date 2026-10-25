@@ -1,0 +1,57 @@
+meta {
+  name: R6 R8 — DescribeServices (private subnets, no public IP, sg-apps on both)
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://ecs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: AmazonEC2ContainerServiceV20141113.DescribeServices
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: ecs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "cluster": "{{cluster_name}}",
+    "services": ["{{writer_service_name}}", "{{reader_service_name}}"]
+  }
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const body = res.getBody();
+  const priv = bru.getVar("private_subnet_ids").split(",").sort();
+  test("both services found and ACTIVE with a running task", function(){
+    expect(body.failures || []).to.deep.equal([]);
+    expect(body.services).to.have.lengthOf(2);
+    for (const s of body.services) { expect(s.status).to.equal("ACTIVE"); expect(s.runningCount).to.be.at.least(1); }
+  });
+  test("R6: private subnets only, assignPublicIp DISABLED", function(){
+    for (const s of body.services) {
+      const c = s.networkConfiguration.awsvpcConfiguration;
+      expect(c.assignPublicIp).to.equal("DISABLED");
+      for (const sn of c.subnets) expect(priv).to.include(sn);
+    }
+  });
+  test("R8: exactly sg-apps on both services", function(){
+    for (const s of body.services) expect(s.networkConfiguration.awsvpcConfiguration.securityGroups).to.deep.equal([bru.getVar("apps_security_group_id")]);
+  });
+  for (const s of body.services) {
+    bru.setVar(s.serviceName === bru.getVar("writer_service_name") ? "writer_task_definition" : "reader_task_definition", s.taskDefinition);
+  }
+}

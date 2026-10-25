@@ -1,0 +1,57 @@
+meta {
+  name: SSM GetParameters (1/2) -> runtime vars
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://ssm.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: AmazonSSM.GetParameters
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: ssm
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "Names": ["/{{projectName}}/outputs/region","/{{projectName}}/outputs/vpc_id","/{{projectName}}/outputs/private_subnet_ids","/{{projectName}}/outputs/apps_security_group_id","/{{projectName}}/outputs/efs_security_group_id","/{{projectName}}/outputs/file_system_id","/{{projectName}}/outputs/writer_access_point_id","/{{projectName}}/outputs/reader_access_point_id"],
+    "WithDecryption": true
+  }
+}
+
+docs {
+  Prerequisite for everything else. Reads Terraform-published IDs from /<project>/outputs/* (plain Strings) with the read-only role. Secrets (if any) live under /<project>/secrets/* and are read the same way when a request needs one.
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const body = res.getBody();
+  test("all 8 outputs present in SSM", function(){
+    expect(body.InvalidParameters || []).to.deep.equal([]);
+    expect(body.Parameters).to.have.lengthOf(8);
+  });
+  for (const p of body.Parameters) {
+    bru.setVar(p.Name.split("/").pop(), p.Value);
+  }
+
+  // Account + partition come from the parameter ARN, so nothing is typed by hand.
+  const m = /^arn:([a-z-]+):ssm:[a-z0-9-]+:(\d{12}):/.exec(body.Parameters[0].ARN);
+  bru.setVar("awsPartition", m[1]); bru.setVar("awsAccountId", m[2]);
+
+  test("ids look real", function(){
+    expect(bru.getVar('file_system_id')).to.match(/^fs-[0-9a-f]+$/);
+  });
+}

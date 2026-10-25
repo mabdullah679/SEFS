@@ -1,0 +1,28 @@
+meta {
+  name: CTR — DescribeBackupPolicy (automatic backups off)
+  type: http
+  seq: 6
+}
+
+get {
+  url: https://elasticfilesystem.{{awsRegion}}.amazonaws.com/2015-02-01/file-systems/{{file_system_id}}/backup-policy
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: elasticfilesystem
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  test("EFS automatic backups DISABLED (R14 is met by our own AWS Backup plan; this avoids an untracked default vault)", function(){
+    expect(res.getBody().BackupPolicy.Status).to.equal("DISABLED");
+  });
+}

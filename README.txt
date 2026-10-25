@@ -23,6 +23,9 @@ The file system is protected from deletion, and Terraform deliberately won't let
 THE ONE PLACE WE DIFFER FROM THE SPEC
 The spec suggests an EFS access point can make the reader read-only. It can't, because access points only set the user, group and folder. The container's read-only flag is easy to remove, and the shared folder is writable by the group on purpose. So the real protection is AWS permissions: the reader's role can only mount, and the file system's own policy explicitly blocks the reader from writing. The e2e test proves it by running the reader with the read-only flag switched off and checking that the write still fails.
 
+BRUNO COLLECTION
+bruno/sefs checks every requirement against the live deployment by calling AWS directly. It stores no credentials: it signs with an AWS profile that borrows a read-only role through your own login for one hour. Its first step reads every deployed ID from AWS's parameter store, so nothing is typed by hand. Run: make bruno-profile SOURCE=<your login profile> once, then make bruno. Two things it can't do, which make verify and make e2e cover: confirm the encryption key is AWS's own, and the test that runs the reader with its read-only flag off.
+
 TEST RESULTS SO FAR (on the main branch, 2026-10-25)
 - Fake-AWS tests: 23 of 23 plus 4 of 4 pass, plus a check that the delete protection is in place. They block all network access, so a passing run made no AWS calls.
 - Deliberate-break tests: we broke 28 rules one at a time (for example turning encryption off, opening the firewall, letting the reader write) and all 28 were caught. A harmless change was correctly not flagged, which shows the harness can't fake a catch.

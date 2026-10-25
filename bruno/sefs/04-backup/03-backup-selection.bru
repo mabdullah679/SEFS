@@ -1,0 +1,28 @@
+meta {
+  name: R14 — GetBackupSelection (covers the EFS)
+  type: http
+  seq: 3
+}
+
+get {
+  url: https://backup.{{awsRegion}}.amazonaws.com/backup/plans/{{backup_plan_id}}/selections/{{backup_selection_id}}
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: backup
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  test("R14: the selection includes this file system's ARN", function(){
+    expect(res.getBody().BackupSelection.Resources).to.include(bru.getVar("file_system_arn"));
+  });
+}

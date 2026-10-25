@@ -1,0 +1,33 @@
+meta {
+  name: R14 — GetBackupPlan (>= 35-day retention)
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://backup.{{awsRegion}}.amazonaws.com/backup/plans/{{backup_plan_id}}/
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: backup
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const plan = res.getBody().BackupPlan;
+  test("R14: at least one rule, every rule keeps >= 35 days in our vault", function(){
+    expect(plan.Rules.length).to.be.at.least(1);
+    for (const r of plan.Rules) {
+      expect(r.Lifecycle.DeleteAfterDays).to.be.at.least(35);
+      expect(r.TargetBackupVaultName).to.equal(bru.getVar("backup_vault_name"));
+    }
+  });
+}

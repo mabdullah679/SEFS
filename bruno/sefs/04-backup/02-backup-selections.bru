@@ -1,0 +1,28 @@
+meta {
+  name: R14 — ListBackupSelections
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://backup.{{awsRegion}}.amazonaws.com/backup/plans/{{backup_plan_id}}/selections/
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: backup
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const sel = res.getBody().BackupSelectionsList;
+  test("the plan has a selection", function(){ expect(sel.length).to.be.at.least(1); });
+  bru.setVar("backup_selection_id", sel[0].SelectionId);
+}

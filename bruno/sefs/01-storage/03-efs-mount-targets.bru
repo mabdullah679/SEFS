@@ -1,0 +1,32 @@
+meta {
+  name: R7 — DescribeMountTargets
+  type: http
+  seq: 3
+}
+
+get {
+  url: https://elasticfilesystem.{{awsRegion}}.amazonaws.com/2015-02-01/mount-targets?FileSystemId={{file_system_id}}
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: elasticfilesystem
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const mts = res.getBody().MountTargets;
+  const priv = bru.getVar("private_subnet_ids").split(",");
+  test("R7: one mount target per private subnet, all available", function(){
+    expect(mts.map(m => m.SubnetId).sort()).to.deep.equal(priv.slice().sort());
+    expect(new Set(mts.map(m => m.AvailabilityZoneName)).size).to.equal(mts.length);
+    for (const m of mts) expect(m.LifeCycleState).to.equal("available");
+  });
+}

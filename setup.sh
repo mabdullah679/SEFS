@@ -104,12 +104,16 @@ else
   echo "      (skipping the local proof suites; --full-tests runs them, ~15 min)"
 fi
 
+echo "== 5b/6 Bruno profile (no credentials stored)"
+src_profile="${AWS_PROFILE:-default}"
+bash scripts/bruno-profile.sh install "$src_profile" "$region" "$NAME" >/dev/null && ok "AWS profile '$NAME-bruno' assumes the read-only role via '$src_profile'"
+
 echo "== 6/6 deploy"
 if [ "$DEPLOY" = 1 ]; then
   [ "$(ask "Run 'make up' now (≈8 min, ≈US\$0.16/h while live)? [y/N]")" = "y" ] || { warn "skipped; run 'make up' when ready"; exit 0; }
   make up AUTO=1
   echo
-  ok "deployed. Next: 'make verify' (live checks), 'make e2e' (behaviour), 'bru run bruno/sefs --env aws' (Bruno), 'CONFIRM_DESTROY_DATA=yes make down' (teardown)"
+  ok "deployed. Next: 'make verify' (live checks), 'make e2e' (behaviour), 'make bruno' (Bruno collection), 'CONFIRM_DESTROY_DATA=yes make down' (teardown)"
 else
   ok "--no-deploy: stopping before 'make up'"
 fi

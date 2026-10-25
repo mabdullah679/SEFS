@@ -1,0 +1,15 @@
+docs {
+  # SEFS — live verification collection
+
+  Every request calls an AWS API directly (SigV4-signed) through the `sefs-bruno`
+  profile, which assumes the read-only role `sefs-bruno-reader` via your own AWS
+  login. No credentials live in this collection, the environment, or the repo.
+
+  Self-hydrating: folder `00-hydrate` reads every deployed ID from SSM Parameter
+  Store (`/sefs/outputs/*`, published by Terraform) into runtime variables; every
+  later request uses those. The only inputs are `awsRegion` and `awsProfile` in the
+  environment.
+
+  Run in order (the CLI does):  bru run --env aws
+  Each request names the requirement ID it checks (R1–R15, see PLAN.md).
+}

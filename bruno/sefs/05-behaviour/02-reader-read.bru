@@ -1,0 +1,51 @@
+meta {
+  name: R3 R1 — reader READ lines match the writer's sha256
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://logs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: Logs_20140328.FilterLogEvents
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: logs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "logGroupName": "{{reader_log_group}}",
+    "filterPattern": ""READ "",
+    "limit": 100
+  }
+}
+
+docs {
+  Sampling note: FilterLogEvents returns up to 100 events per call; the comparison is over the overlap of the two samples, not the whole history. tests/live/e2e.sh does the exhaustive version.
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const ev = res.getBody().events.map(e => e.message);
+  const read = ev.filter(m => /^READ \S+ sha256=[0-9a-f]{64}$/.test(m)).map(m => m.slice(5));
+  const wrote = new Set(JSON.parse(bru.getVar("wrote_lines") || "[]"));
+  test("the reader has read files", function(){ expect(read.length).to.be.at.least(1); });
+  test("every READ seen in the last 100 writer lines matches a WROTE byte-for-byte (same name + sha256)", function(){
+    const both = read.filter(r => [...wrote].some(w => w.split(" ")[0] === r.split(" ")[0]));
+    expect(both.length, "no overlap between the sampled WROTE and READ lines").to.be.at.least(1);
+    for (const r of both) expect(wrote.has(r), "sha256 mismatch for " + r).to.equal(true);
+  });
+}

@@ -1,0 +1,50 @@
+meta {
+  name: R3 — DescribeFileSystemPolicy (the read-only control)
+  type: http
+  seq: 5
+}
+
+get {
+  url: https://elasticfilesystem.{{awsRegion}}.amazonaws.com/2015-02-01/file-systems/{{file_system_id}}/policy
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: elasticfilesystem
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+docs {
+  SPEC DRIFT: an EFS access point has no read-only switch. This policy is the compensating control; the container readOnly flag alone is not one.
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const pol = JSON.parse(res.getBody().Policy);
+  const arr = x => Array.isArray(x) ? x : [x];
+  const stmts = pol.Statement;
+  const denies = stmts.filter(s => s.Effect === "Deny");
+  test("R3: an explicit, unconditional Deny of ClientWrite + ClientRootAccess exists for a role principal", function(){
+    const d = denies.find(s => arr(s.Action).includes("elasticfilesystem:ClientWrite") && arr(s.Action).includes("elasticfilesystem:ClientRootAccess"));
+    expect(d, "reader deny statement missing").to.exist;
+    expect(d.Condition).to.be.undefined;
+    expect(JSON.stringify(d.Principal)).to.match(/:role\//);
+    bru.setVar("reader_role_arn_from_policy", arr(d.Principal.AWS)[0]);
+  });
+  test("plaintext NFS is denied for everyone", function(){
+    const d = denies.find(s => s.Condition && s.Condition.Bool && s.Condition.Bool["aws:SecureTransport"] === "false");
+    expect(d, "deny-insecure-transport missing").to.exist;
+  });
+  test("no Allow grants to * and nobody gets ClientRootAccess", function(){
+    for (const s of stmts.filter(s => s.Effect === "Allow")) {
+      expect(JSON.stringify(s.Principal)).to.not.equal('"*"');
+      expect(arr(s.Action)).to.not.include("elasticfilesystem:ClientRootAccess");
+    }
+  });
+}

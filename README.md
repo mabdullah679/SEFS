@@ -96,6 +96,26 @@ An EFS access point has **no read-only setting**; it only sets the user, group a
 
 Mother inputs are in [variables.tf](variables.tf) (all have defaults); outputs in [outputs.tf](outputs.tf).
 
+## Bruno collection (live, read-only, self-hydrating)
+
+[bruno/sefs](bruno/sefs) checks every requirement against the live deployment by calling the AWS APIs directly (SigV4). It holds **no credentials**: requests sign with the `sefs-bruno` AWS profile, whose `credential_process` ([scripts/bruno-creds.sh](scripts/bruno-creds.sh)) assumes the least-privilege role `sefs-bruno-reader` ([modules/access](modules/access/main.tf), read-only, SSM scoped to `/sefs/*`) through your own login. Folder `00-hydrate` reads every deployed ID from SSM (`/sefs/outputs/*`, published by [modules/registry](modules/registry/main.tf)); nothing is typed by hand.
+
+```bash
+make bruno-profile SOURCE=<your AWS login profile>   # once (setup.sh does this)
+make bruno                                           # bru run bruno/sefs --env aws
+```
+
+| Folder | Checks |
+|---|---|
+| `00-hydrate` | SSM outputs → runtime vars (prerequisite) |
+| `01-storage` | R12 R13 R4 R15 R7 R10 R2/R3 (same path) R3 (FS policy Deny) + auto-backups off |
+| `02-network` | R9 (sg-efs: one rule, 2049 from sg-apps), R8 (sg-apps: no ingress) |
+| `03-compute` | R6 R8 (services), R3 (reader readOnly + IAM auth + same role the policy denies), R2 (writer rw) |
+| `04-backup` | R14 (plan ≥ 35 days, selection covers the EFS) |
+| `05-behaviour` | R2 WROTE lines, R3/R1 READ lines match sha256, reader WRITE_PROBE DENIED |
+
+Honest limits: R13's "AWS-managed key" alias check and the IAM mutation (write denied with the mount flag off) are not in Bruno; `make verify` and `make e2e` cover them.
+
 ## Tests
 
 All local tests are free and need no AWS account: the unit tests use Terraform's mock provider with network access blocked, so a passing run made no AWS call.

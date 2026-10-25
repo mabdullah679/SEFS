@@ -1,0 +1,51 @@
+meta {
+  name: R3 — DescribeTaskDefinition (reader)
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://ecs.{{awsRegion}}.amazonaws.com/
+  body: json
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-amz-json-1.1
+  X-Amz-Target: AmazonEC2ContainerServiceV20141113.DescribeTaskDefinition
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: ecs
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:json {
+  {
+    "taskDefinition": "{{reader_task_definition}}"
+  }
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const td = res.getBody().taskDefinition;
+  const vol = td.volumes[0].efsVolumeConfiguration;
+  const mp = td.containerDefinitions[0].mountPoints[0];
+  test("volume is the shared EFS via the reader access point, TLS + IAM authorization on", function(){
+    expect(vol.fileSystemId).to.equal(bru.getVar("file_system_id"));
+    expect(vol.transitEncryption).to.equal("ENABLED");
+    expect(vol.authorizationConfig.iam).to.equal("ENABLED");
+    expect(vol.authorizationConfig.accessPointId).to.equal(bru.getVar("reader_access_point_id"));
+  });
+  test("R3: container mount readOnly=true", function(){ expect(mp.readOnly).to.equal(true); });
+
+  test("R3: the reader's task role is the role the FS policy denies write to", function(){
+    expect(td.taskRoleArn).to.equal(bru.getVar("reader_role_arn_from_policy"));
+  });
+  test("ARM64 Fargate", function(){ expect(td.runtimePlatform.cpuArchitecture).to.equal("ARM64"); });
+}

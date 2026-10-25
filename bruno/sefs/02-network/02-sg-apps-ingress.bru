@@ -1,0 +1,42 @@
+meta {
+  name: R8 — sg-apps: no ingress at all
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://ec2.{{awsRegion}}.amazonaws.com/
+  body: text
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: ec2
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:text {
+  Action=DescribeSecurityGroupRules&Version=2016-11-15&Filter.1.Name=group-id&Filter.1.Value.1={{apps_security_group_id}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const xml = res.getBody();
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1]);
+  const tag = (s, t) => { const m = new RegExp("<" + t + ">([^<]*)</" + t + ">").exec(s); return m ? m[1] : null; };
+  const rules = items.filter(i => tag(i, "securityGroupRuleId")).map(i => ({
+    egress: tag(i, "isEgress") === "true", from: tag(i, "fromPort"), to: tag(i, "toPort"), proto: tag(i, "ipProtocol"),
+    cidr: tag(i, "cidrIpv4"), cidr6: tag(i, "cidrIpv6"), ref: (/<referencedGroupInfo>[\s\S]*?<groupId>([^<]+)<\/groupId>/.exec(i) || [])[1] || null
+  }));
+
+  test("R8: sg-apps has zero ingress rules", function(){ expect(rules.filter(r => !r.egress)).to.have.lengthOf(0); });
+}

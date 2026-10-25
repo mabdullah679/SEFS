@@ -1,0 +1,49 @@
+meta {
+  name: R9 — sg-efs: exactly one ingress rule, 2049 from sg-apps
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://ec2.{{awsRegion}}.amazonaws.com/
+  body: text
+  auth: awsv4
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: ec2
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+body:text {
+  Action=DescribeSecurityGroupRules&Version=2016-11-15&Filter.1.Name=group-id&Filter.1.Value.1={{efs_security_group_id}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  const xml = res.getBody();
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => m[1]);
+  const tag = (s, t) => { const m = new RegExp("<" + t + ">([^<]*)</" + t + ">").exec(s); return m ? m[1] : null; };
+  const rules = items.filter(i => tag(i, "securityGroupRuleId")).map(i => ({
+    egress: tag(i, "isEgress") === "true", from: tag(i, "fromPort"), to: tag(i, "toPort"), proto: tag(i, "ipProtocol"),
+    cidr: tag(i, "cidrIpv4"), cidr6: tag(i, "cidrIpv6"), ref: (/<referencedGroupInfo>[\s\S]*?<groupId>([^<]+)<\/groupId>/.exec(i) || [])[1] || null
+  }));
+
+  const ingress = rules.filter(r => !r.egress);
+  test("R9: exactly one ingress rule", function(){ expect(ingress).to.have.lengthOf(1); });
+  test("R9: it is TCP 2049 referencing sg-apps, no CIDR", function(){
+    const r = ingress[0];
+    expect(r.proto).to.equal("tcp"); expect(r.from).to.equal("2049"); expect(r.to).to.equal("2049");
+    expect(r.ref).to.equal(bru.getVar("apps_security_group_id"));
+    expect(r.cidr).to.be.null; expect(r.cidr6).to.be.null;
+  });
+}

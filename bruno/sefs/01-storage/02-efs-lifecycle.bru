@@ -1,0 +1,30 @@
+meta {
+  name: R15 — DescribeLifecycleConfiguration
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://elasticfilesystem.{{awsRegion}}.amazonaws.com/2015-02-01/file-systems/{{file_system_id}}/lifecycle-configuration
+  body: none
+  auth: awsv4
+}
+
+auth:awsv4 {
+  accessKeyId: 
+  secretAccessKey: 
+  sessionToken: 
+  service: elasticfilesystem
+  region: {{awsRegion}}
+  profileName: {{awsProfile}}
+}
+
+tests {
+  test("HTTP 200", function(){ expect(res.getStatus()).to.equal(200); });
+
+  test("R15: transition to IA after 30 days", function(){
+    const p = res.getBody().LifecyclePolicies.find(x => x.TransitionToIA);
+    expect(p, "no TransitionToIA policy").to.exist;
+    expect(p.TransitionToIA).to.equal("AFTER_30_DAYS");
+  });
+}
