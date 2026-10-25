@@ -66,6 +66,16 @@ variable "create_oidc_provider" {
   default = true
 }
 
+variable "github_owner_id" {
+  type    = number
+  default = null
+}
+
+variable "github_repo_id" {
+  type    = number
+  default = null
+}
+
 module "bootstrap" {
   source = "../modules/bootstrap"
 
@@ -76,6 +86,8 @@ module "bootstrap" {
   github_repo          = var.github_repo
   github_branch        = var.github_branch
   create_oidc_provider = var.create_oidc_provider
+  github_owner_id      = var.github_owner_id
+  github_repo_id       = var.github_repo_id
 }
 
 output "state_bucket" { value = module.bootstrap.state_bucket }
