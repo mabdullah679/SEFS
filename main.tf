@@ -49,6 +49,8 @@ module "images" {
   name           = var.name
   writer_context = abspath("${path.root}/apps/writer-python")
   reader_context = abspath("${path.root}/apps/reader-springboot")
+
+  build_timeout_seconds = var.image_build_timeout_seconds
 }
 
 module "apps" {

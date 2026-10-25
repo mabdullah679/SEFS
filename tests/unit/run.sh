@@ -19,6 +19,11 @@
 # Exit 0 only if every selected suite ran AND passed. A suite that could not
 # run is a failure, never a pass.
 set -euo pipefail
+# Offline suites must never touch the real backend. Once `make init` has configured the S3
+# backend in .terraform/, `init -backend=false` REUSES it (and needs AWS credentials), so
+# the offline runs get their own data dir with no backend in it.
+export TF_DATA_DIR="${TF_DATA_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/sefs-tfdata.XXXXXX")}"
+export TF_PLUGIN_CACHE_DIR="${TF_PLUGIN_CACHE_DIR:-$HOME/.terraform.d/plugin-cache}"; mkdir -p "$TF_PLUGIN_CACHE_DIR"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TREE="$(cd "${1:-$HERE/../..}" && pwd)"

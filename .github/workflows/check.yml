@@ -42,6 +42,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       TF_VAR_region: ${{ vars.AWS_REGION }}
       TF_VAR_allowed_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      TF_VAR_image_build_timeout_seconds: "2400"   # x86 runner builds arm64 images under QEMU: slower than native
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -73,6 +74,9 @@ jobs:
         env: { CHILDREN: "${{ steps.diff.outputs.children }}" }
         run: |
           set -euo pipefail
+          if [ "$(terraform state list 2>/dev/null | wc -l)" -eq 0 ]; then
+            echo "remote state is empty: the first deploy is always a full apply"; CHILDREN=full
+          fi
           case "$CHILDREN" in
             none) echo "nothing deployable changed; verify only" ;;
             full) terraform apply -input=false -auto-approve ;;

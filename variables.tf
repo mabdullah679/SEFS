@@ -110,3 +110,9 @@ variable "bruno_trusted_principal_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "image_build_timeout_seconds" {
+  description = "Watchdog per image build+push attempt (modules/images). CI sets a higher value for emulated builds."
+  type        = number
+  default     = 1200
+}
