@@ -28,6 +28,7 @@ Settled decisions, newest last. Each says who decided, when, and what the obviou
 | D22 | 2026-10-25 | owner | Terraform state moves to an **S3 bucket + DynamoDB lock table in the account**, created once by a tiny local-state `bootstrap/` stack that also holds the GitHub OIDC deploy role (so CI never manages its own role or its own state store) | HCP Terraform: third-party account + token for a client clone. Local state with CI as sole applier: kills the "test one child locally" flow and a laptop apply would fork state |
 | D23 | 2026-10-25 | owner | The 2.5D GUI is a **sidewagon**: a separate, optional child (`enable_gui`, default on) so a client can tell their agent to skip it; serverless so idle cost is ≈ 0 | Mandatory GUI: bloats a stack whose core is storage; a Fargate-hosted GUI: compute billed while idle |
 | D24 | 2026-10-25 | owner | No large files in Git: `.gitignore` patterns for archives/binaries/media/3D assets **and** a pre-commit hook refusing files > 5 MB (owner keeps hitting the LFS quota). 3D models for the GUI are procedural (three.js primitives), not binary assets | Patterns alone: cannot anticipate every binary |
+| D25 | 2026-10-25 | owner | GUI access = **Cognito user pool** login in front of the page and the API; `setup.sh` creates the first user; no AWS credentials in the browser | Signed requests only: no browser login, needs a local signing helper. Unlisted URL: topology of the account readable by anyone with the link |
 
 ## Spec drift: "read-only" on an access point
 
