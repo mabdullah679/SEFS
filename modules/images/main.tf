@@ -100,19 +100,30 @@ resource "terraform_data" "build" {
       attempt=0
       while :; do
         attempt=$((attempt + 1))
+        started=$(date +%s)
         docker buildx build --platform "$PLATFORM" --provenance=false \
           --tag "$REPO_URL:$TAG" --push "$CONTEXT" &
         bpid=$!
-        ( sleep "$BUILD_TIMEOUT" && kill "$bpid" 2>/dev/null && echo "watchdog: attempt $attempt exceeded $BUILD_TIMEOUT s, killed" ) &
+        # The watchdog must NOT inherit this script's stdout/stderr: Terraform reads those pipes
+        # until EOF, and an orphaned `sleep` holding them stalled a finished push for the full
+        # timeout (observed in CI, 2026-10-25). Hence the fd redirect and the explicit pkill.
+        ( sleep "$BUILD_TIMEOUT"; kill "$bpid" 2>/dev/null ) >/dev/null 2>&1 </dev/null &
         wpid=$!
-        # The watchdog may already have exited (it fired); a failed kill must not trip set -e.
-        if wait "$bpid"; then kill "$wpid" 2>/dev/null || true; break; fi
+        if wait "$bpid"; then rc=0; else rc=$?; fi
+        pkill -P "$wpid" 2>/dev/null || true
         kill "$wpid" 2>/dev/null || true
+        [ "$rc" -eq 0 ] && break
+        elapsed=$(( $(date +%s) - started ))
+        if [ "$elapsed" -ge "$BUILD_TIMEOUT" ]; then
+          echo "watchdog: attempt $attempt exceeded $BUILD_TIMEOUT s and was killed"
+        else
+          echo "attempt $attempt failed (exit $rc) after $elapsed s"
+        fi
         if [ "$attempt" -ge "$BUILD_ATTEMPTS" ]; then
           echo "build/push of $REPO_URL:$TAG failed after $attempt attempts" >&2
           exit 1
         fi
-        echo "attempt $attempt failed; retrying in 15 s"; sleep 15
+        echo "retrying in 15 s"; sleep 15
       done
     EOT
   }

@@ -45,7 +45,10 @@ Already have a GitHub OIDC provider in the account? AWS allows one per issuer: r
 
 `CONFIRM_DESTROY_DATA=yes make down` removes the deployment but **keeps** the state bucket, lock table and CI role. Add `DESTROY_STATE=yes` to remove those too (the bucket is versioned, so this needs the explicit flag).
 
-## Three things learned the hard way
+## Five things learned the hard way
+
+- **A watchdog must not hold Terraform's pipes.** The image-push watchdog's `sleep` inherited the local-exec stdout; Terraform waits for EOF, so a push that finished in 1 minute "completed" after the full 40-minute timeout. Now the watchdog runs with its fds detached and its `sleep` is killed explicitly; the proof runs the loop under `$(...)` and times it.
+- **A cancelled apply can orphan ECS services.** AWS had `sefs-writer`/`sefs-reader`, state did not, and the next `CreateService` failed ("not idempotent"). `scripts/adopt-orphans.sh` imports such services before every apply (`make up` and CI).
 
 - **GitHub's `sub` claim carries numeric IDs.** Observed 2026-10-25 on the first "check" run: `repo:mabdullah679@131607929/SEFS@1433201237:ref:refs/heads/main`, not the documented `repo:owner/repo:ref:...`. IAM therefore refused the ID-less trust ("Not authorized to perform sts:AssumeRoleWithWebIdentity"). The role now trusts the exact ID-pinned string (plus the plain form), still `StringEquals`, no wildcards; `make bootstrap` resolves both IDs with `gh api`. The workflow prints `iss/aud/sub` (never the token) before assuming the role so a future format change is visible in one glance.
 

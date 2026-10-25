@@ -19,7 +19,9 @@ make up, make apply-one and make down all use the shared state. The local tests 
 TEARDOWN
 make down removes the deployment but keeps the state storage and the deploy role, because the next deploy needs them. Add DESTROY_STATE=yes to remove those too.
 
-THREE THINGS LEARNED THE HARD WAY
+FIVE THINGS LEARNED THE HARD WAY
+- The image-build timer was quietly holding Terraform's output open, so a push that finished in a minute looked like it took the whole 40-minute limit. Fixed and proven with a timed test.
+- If a deploy is cancelled halfway, AWS can keep the two app services while Terraform forgets them, and the next deploy then fails. A small adopt step now re-attaches them before every deploy.
 - GitHub now identifies a repo in its login token by number as well as by name (owner@id/repo@id). The first real run was refused because the role only trusted the name form. The role now trusts the exact numbered form too, with no wildcards, and the workflow prints what GitHub sent so a future change is obvious.
 - If you sign in with the newer aws login command, Terraform's state storage can't read that login type. make tf-profile creates a small helper profile that passes the same login through, and make preflight refuses to run until you use it. GitHub is unaffected.
 - After the shared state is set up, Terraform's "offline" mode still tries to reach it. The local test runners now use their own working folder, so make test needs no AWS access at all.

@@ -45,6 +45,7 @@ init: ## terraform init against the shared S3 state (needs backend.hcl from `mak
 	$(TF) init -input=false -backend-config=backend.hcl -migrate-state -force-copy
 
 up: preflight init ## Deploy everything with ONE terraform apply (AUTO=1 to skip the prompt)
+	bash scripts/adopt-orphans.sh
 	$(TF) apply $(APPROVE)
 
 apply-one: init ## Update one child only: make apply-one CHILD=efs

@@ -96,6 +96,8 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 - Terraform 1.9's S3 backend can't read `aws login` session profiles → `make tf-profile` creates `sefs-tf` (credential_process), preflight refuses otherwise.
 - Once the S3 backend is initialised, `init -backend=false` *reuses* it → offline suites use their own `TF_DATA_DIR`.
 - GitHub's OIDC `sub` claim now includes numeric IDs (`repo:owner@id/repo@id:ref:…`) → the deploy role trusts that exact string.
+- The image-push watchdog once held Terraform's stdout pipe (orphaned `sleep`) → a 1-minute push "took" 40 minutes; watchdog fds are now detached.
+- A cancelled apply left ECS services in AWS but not in state → `scripts/adopt-orphans.sh` runs before every apply.
 - A fixed task-role name would be locked out of the EFS if the role were ever recreated → `name_prefix`.
 
 ## 8. If you are asked to change something

@@ -78,6 +78,7 @@ jobs:
         env: { CHILDREN: "${{ steps.diff.outputs.children }}" }
         run: |
           set -euo pipefail
+          bash scripts/adopt-orphans.sh   # a cancelled run can leave ECS services in AWS but not in state
           if [ "$(terraform state list 2>/dev/null | wc -l)" -eq 0 ]; then
             echo "remote state is empty: the first deploy is always a full apply"; CHILDREN=full
           fi
