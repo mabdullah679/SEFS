@@ -1,0 +1,26 @@
+TRACEABILITY - PLAIN TWIN OF TRACEABILITY.md (2026-10-25)
+For each requirement: what enforces it, and how it's tested. "Live" means real AWS, which hasn't run yet.
+
+R1 Data survives the apps: the file system doesn't depend on the apps. Live test: destroy only the apps, check the file system is the same one, rebuild, and confirm the reader reads the old files with matching fingerprints.
+R2 Writer can write: the writer's role can mount and write, and its mount is read-write. Fake-AWS tests and 1 break test. Live: written files are read back identical.
+R3 Reader can only read, at the same path: the reader's role can only mount; the file system policy blocks reader writes unconditionally and refuses unencrypted connections; the apps wait for that policy. Fake-AWS tests and 9 break tests. Live: the reader with its read-only flag OFF must still fail to write. That test is the real proof; the reader's own startup check only proves the flag.
+R4 Delete protection: a text check on the real code plus 2 break tests (Terraform's test tool can't see this setting).
+R5 2+ data centers: a setting that rejects fewer than 2. Fake-AWS tests and 1 break test. Live check.
+R6 Apps in private subnets, no public IPs: fake-AWS tests, 2 break tests, live check.
+R7 One mount point per private data center: fake-AWS test, 1 break test, live check.
+R8 Both apps share the app firewall group, which accepts nothing inbound: fake-AWS tests, 1 break test, live check.
+R9 The storage firewall allows only port 2049 from the apps: fake-AWS test, 2 break tests. Live check counts every inbound rule, which also catches an extra rule added somewhere else.
+R10 Fixed user and group IDs, same folder for both: fake-AWS test, 1 break test, live check.
+R11 Built from separate pieces: a test that the whole thing plans without errors and every output is wired.
+R12 Encrypted, standard performance, standard throughput: fake-AWS test, 3 break tests, live check.
+R13 Encryption key (AWS's own or yours): tested with your own key. The "AWS's own key" case can only be checked live.
+R14 Backups kept 35+ days: a setting that rejects less, fake-AWS tests, 2 break tests, live check.
+R15 Cheaper storage after 30 days: fake-AWS tests, 2 break tests, live check.
+Extra: EFS's built-in automatic backups stay off. Fake-AWS test, 1 break test, live check.
+Extra: code matches what's running: live only, Terraform must report no changes.
+
+GAPS, PLAINLY
+1. Nothing has run on real AWS yet. The live checker was only tested against made-up AWS responses. A mismatch would show as FAIL or UNVERIFIED, never as a false PASS.
+2. AWS doesn't document which error a write gets when write permission is missing. The test accepts any of the three possible "denied" errors and records which one it saw.
+3. The reader's startup "write blocked" check only proves the read-only flag, not the real protection.
+4. During the live "destroy the apps" test, the file system briefly has no custom policy. Nothing can reach it in that window, because the storage firewall only admits the apps and they're gone.
