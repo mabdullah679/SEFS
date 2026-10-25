@@ -34,7 +34,8 @@ mkfix() {
  "writer_service_name":{"value":"sefs-writer"},"reader_service_name":{"value":"sefs-reader"},
  "writer_log_group":{"value":"/ecs/sefs/writer"},"reader_log_group":{"value":"/ecs/sefs/reader"},
  "reader_task_definition_arn":{"value":"arn:aws:ecs:us-east-1:$ACC:task-definition/sefs-reader:1"},
- "alarm_names":{"value":["sefs-reader-no-running-task","sefs-writer-no-running-task","sefs-efs-burst-credits-low"]}}
+ "alarm_names":{"value":["sefs-reader-no-running-task","sefs-writer-no-running-task","sefs-efs-burst-credits-low"]},
+ "region":{"value":"us-east-1"},"name":{"value":"sefs"},"az_count":{"value":2},"kms_key_arn":{"value":null}}
 EOF
   cat >"$d/cloudwatch.describe-alarms.json" <<'EOF'
 {"MetricAlarms":[
@@ -178,6 +179,7 @@ scenario alarm_missing    "J cloudwatch.describe-alarms.json '.MetricAlarms |= .
 scenario alarm_no_action  "J cloudwatch.describe-alarms.json '.MetricAlarms[0].AlarmActions=[]'" 1 "OBS FAIL"
 scenario insights_off     "J ecs.describe-clusters.json '.clusters[0].settings[0].value=\"disabled\"'" 1 "OBS FAIL"
 scenario legacy_no_obs    "J tf-output.json 'del(.alarm_names)'" 1 "OBS UNVERIFIED"
+scenario no_az_count_out  "J tf-output.json 'del(.az_count)'" 1
 scenario sg_efs_cidr      "J ec2.describe-security-group-rules.sg-e.json '.SecurityGroupRules += [{IsEgress:false,IpProtocol:\"tcp\",FromPort:2049,ToPort:2049,CidrIpv4:\"10.0.0.0/8\"}]'" 1 "R9 FAIL"
 scenario sg_efs_from_cidr "J ec2.describe-security-group-rules.sg-e.json '.SecurityGroupRules[0] |= (del(.ReferencedGroupInfo) | .CidrIpv4=\"0.0.0.0/0\")'" 1 "R9 FAIL"
 scenario reader_rw_mount  "J ecs.describe-task-definition.reader.json '.taskDefinition.containerDefinitions[0].mountPoints[0].readOnly=false'" 1 "R3 FAIL"
