@@ -73,7 +73,7 @@ done
 check "log groups"      "aws logs describe-log-groups --region $region --log-group-name-prefix /ecs/$name/ --query 'logGroups[].logGroupName' --output text"
 check "backup vaults"   "aws backup list-backup-vaults --region $region --query \"BackupVaultList[?starts_with(BackupVaultName,'$name')].BackupVaultName\" --output text"
 check "backup plans"    "aws backup list-backup-plans --region $region --query \"BackupPlansList[?starts_with(BackupPlanName,'$name')].BackupPlanName\" --output text"
-check "IAM roles"       "aws iam list-roles --query \"Roles[?starts_with(RoleName,'$name-')].RoleName\" --output text"
+check "IAM roles"       "aws iam list-roles --query \"Roles[?starts_with(RoleName,'$name-') && RoleName!='$name-github-deploy'].RoleName\" --output text"
 
 # Advisory only: the tagging API keeps deleted resources listed for a while.
 lag=$(aws resourcegroupstaggingapi get-resources --region "$region" \

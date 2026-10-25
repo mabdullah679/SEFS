@@ -82,5 +82,5 @@ verify: ## Real AWS: every R-ID checked against live state + plan shows no drift
 e2e: ## Real AWS: write/read, IAM ro mutation, persistence across app destroy
 	bash tests/live/e2e.sh
 
-down: init ## Destroy EVERYTHING incl. the EFS data (keeps state bucket unless DESTROY_STATE=yes). Requires CONFIRM_DESTROY_DATA=yes
+down: preflight init ## Destroy EVERYTHING incl. the EFS data (keeps state bucket unless DESTROY_STATE=yes). Requires CONFIRM_DESTROY_DATA=yes
 	bash scripts/teardown.sh
