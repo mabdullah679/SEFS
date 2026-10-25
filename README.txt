@@ -8,6 +8,8 @@ WHAT YOU NEED
 Terraform 1.9 or newer, Docker, the AWS CLI logged into the account, make and bash (on Windows, use WSL2). You don't need Java, Maven or Python; the apps are built inside Docker. Nothing listens on your machine.
 
 HOW TO RUN
+Fresh clone, one command: ./setup.sh. It checks your tools, shows which AWS account you're logged into and asks you to confirm, writes the local account file, asks for any secrets the project lists (none today) and stores them only in AWS's parameter store as encrypted values, never on the command line or in Terraform's records, then deploys. make test-setup proves a secret can't leak, using a fake AWS.
+Step by step instead:
 make up: checks your tools and which AWS account you're in, then deploys everything in one Terraform apply. The app images are built and uploaded as part of that same apply.
 make verify: checks every requirement against what AWS actually reports, then confirms Terraform sees no difference between the code and what's running.
 make e2e (needs E2E_CONFIRM=yes): proves the writer writes, the reader reads, the reader can't write even with its read-only flag off, and the data survives the apps being destroyed.

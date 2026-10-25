@@ -5,10 +5,16 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
+.PHONY: help setup test-setup preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
+
+setup: ## Fresh clone: host checks, confirm AWS account, store secrets in SSM, deploy (./setup.sh)
+	./setup.sh
+
+test-setup: ## Prove setup.sh never leaks a secret (fake aws, no AWS calls)
+	bash tests/setup/selftest.sh
 
 preflight: ## Check host tools and show which AWS account/region you're about to touch
 	@test -f account.auto.tfvars || { echo "Refusing: create account.auto.tfvars with allowed_account_id = \"<12-digit id>\" (the ONLY account to deploy into)"; exit 1; }
@@ -32,7 +38,7 @@ apply-one: init ## Update one child only: make apply-one CHILD=efs
 plan: init
 	$(TF) plan
 
-test: test-unit test-mutation test-contract ## All local (fake-AWS + Docker) proofs
+test: test-unit test-mutation test-contract test-setup ## All local (fake-AWS + Docker) proofs
 
 test-unit: ## terraform test against mocked AWS
 	bash tests/unit/run.sh

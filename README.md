@@ -31,6 +31,10 @@ The host does **not** need Java, Maven or Python; both apps build inside Docker.
 
 ## Run it
 
+**Fresh clone, one command:** `./setup.sh` (or `make setup`). It checks the host tools, shows which AWS account your credentials resolve to and asks you to confirm it, writes the git-ignored `account.auto.tfvars`, prompts for any secret listed in [secrets.manifest](secrets.manifest) and stores it only as an SSM SecureString (streamed on stdin, never on argv, never in Terraform state), then runs `make up`. `./setup.sh --no-deploy` stops before the deploy. Proof that a secret never leaks: `make test-setup` ([tests/setup/selftest.sh](tests/setup/selftest.sh)).
+
+Step by step instead:
+
 ```bash
 make up          # preflight (tools, AWS identity) + terraform init + ONE terraform apply
 make verify      # every R-ID checked against live AWS, then terraform plan must show no changes
