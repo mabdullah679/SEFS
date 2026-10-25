@@ -21,6 +21,8 @@ Settled decisions, newest last. Each says who decided, when, and what the obviou
 | D15 | 2026-10-25 | lead | Task roles use `name_prefix` | Fixed names: a replaced role keeps its ARN, the FS policy doesn't update, and AWS's stored principal ID goes stale, locking the role out of the EFS |
 | D16 | 2026-10-25 | lead | Network: `az_count` capped at 8 (subnet slicing), and public subnets don't auto-assign public IPs | Uncapped: subnets would overlap above 8 AZs. Public IPs: nothing needs them; the NATs use their own EIPs |
 | D17 | 2026-10-25 | owner | Live proof runs in account **445137568806 ("production")**, region **ap-southeast-2**, after the lead flagged it is the prod-named account | The "Costs and Credits" account (346208529954): owner chose the current session. Isolation: own VPC, all resources tagged `Project=sefs`, teardown deletes only Terraform-tracked + tagged resources |
+| D18 | 2026-10-25 | owner | Final-vision build is gated by the owner on `/usage`; lead works one item at a time in small stoppable chunks, no agent fan-out without an explicit go | Agent fleet: fastest, but the lead cannot read usage meters, so a fan-out could overrun the owner's budget unseen |
+| D19 | 2026-10-25 | lead | Secrets: none exist today. `setup.sh` prompts from `secrets.manifest` (empty) and stores each ONLY as an SSM SecureString under `/<name>/secrets/`, streamed on stdin; Terraform never creates secrets | Terraform-managed secrets: values land in state. A verifier IAM user with stored keys: circular, Bruno needs an AWS login to read SSM anyway |
 
 ## Spec drift: "read-only" on an access point
 
