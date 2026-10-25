@@ -8,14 +8,14 @@
 #   S5 a wrong account answer ('n') aborts before writing anything
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; REPO="$(cd "$HERE/../.." && pwd)"
-W="$(mktemp -d "${TMPDIR:-/tmp}/sefs-setup.XXXXXX")"; trap 'rm -rf "$W"' EXIT
+W="$(mktemp -d "${TMPDIR:-/tmp}/sefs-setup.XXXXXX")"; [ -n "${KEEP:-}" ] && echo "W=$W" || trap 'rm -rf "$W"' EXIT
 SECRET="hunter2-$(date +%s)-$$"
 fail=0; pass() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fail=1; }
 
 # --- repo copy (git-tracked files only, plus a .git so check-ignore works)
 mkdir -p "$W/repo"; (cd "$REPO" && git ls-files -z | xargs -0 tar cf - ) | tar xf - -C "$W/repo"
-git -C "$W/repo" init -q && git -C "$W/repo" add -A && git -C "$W/repo" -c user.email=t@t -c user.name=t commit -qm init
 echo "api_key test secret" > "$W/repo/secrets.manifest"
+git -C "$W/repo" init -q && git -C "$W/repo" add -A && git -C "$W/repo" -c user.email=t@t -c user.name=t commit -qm init
 
 # --- fake aws / terraform / make / docker
 mkdir -p "$W/bin"
@@ -29,7 +29,7 @@ case "$1 $2" in
   "ssm get-parameter") exit 255 ;;              # not stored yet
   "ssm put-parameter") cat > "$FAKE_LOG.put-stdin" ;;
   "ssm add-tags-to-resource") : ;;
-  "--version") echo "aws-cli/2.17.0 Python/3.11" ;;
+  "--version "*) echo "aws-cli/2.17.0 Python/3.11" ;;
   *) echo "fake aws: unexpected $*" >&2; exit 99 ;;
 esac
 EOF
