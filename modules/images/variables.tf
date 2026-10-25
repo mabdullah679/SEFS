@@ -21,3 +21,15 @@ variable "platform" {
   default     = "linux/arm64"
 }
 
+
+variable "build_timeout_seconds" {
+  description = "Watchdog per build+push attempt. A healthy push of both images takes < 7 min."
+  type        = number
+  default     = 1200
+}
+
+variable "build_attempts" {
+  description = "Build+push attempts before the apply fails."
+  type        = number
+  default     = 3
+}

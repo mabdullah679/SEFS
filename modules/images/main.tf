@@ -59,11 +59,13 @@ resource "terraform_data" "build" {
   provisioner "local-exec" {
     interpreter = ["/bin/sh", "-c"]
     environment = {
-      REPO_URL = aws_ecr_repository.this[each.key].repository_url
-      REPO     = aws_ecr_repository.this[each.key].name
-      TAG      = local.content_hash[each.key]
-      CONTEXT  = each.value
-      PLATFORM = var.platform
+      REPO_URL       = aws_ecr_repository.this[each.key].repository_url
+      REPO           = aws_ecr_repository.this[each.key].name
+      TAG            = local.content_hash[each.key]
+      CONTEXT        = each.value
+      PLATFORM       = var.platform
+      BUILD_TIMEOUT  = tostring(var.build_timeout_seconds)
+      BUILD_ATTEMPTS = tostring(var.build_attempts)
     }
     command = <<-EOT
       set -eu
@@ -92,8 +94,25 @@ resource "terraform_data" "build" {
         echo "image $REPO_URL:$TAG already present, skipping build"
         exit 0
       fi
-      docker buildx build --platform "$PLATFORM" --provenance=false \
-        --tag "$REPO_URL:$TAG" --push "$CONTEXT"
+      # A push over a bad link can crawl for hours while the rest of the stack bills
+      # (observed 2026-10-25: 2h09m at ~37 KB/s, then "broken pipe"). Bound each attempt
+      # with a watchdog and retry; macOS has no `timeout`, hence the shell version.
+      attempt=0
+      while :; do
+        attempt=$((attempt + 1))
+        docker buildx build --platform "$PLATFORM" --provenance=false \
+          --tag "$REPO_URL:$TAG" --push "$CONTEXT" &
+        bpid=$!
+        ( sleep "$BUILD_TIMEOUT" && kill "$bpid" 2>/dev/null && echo "watchdog: attempt $attempt exceeded $BUILD_TIMEOUT s, killed" ) &
+        wpid=$!
+        if wait "$bpid"; then kill "$wpid" 2>/dev/null; break; fi
+        kill "$wpid" 2>/dev/null
+        if [ "$attempt" -ge "$BUILD_ATTEMPTS" ]; then
+          echo "build/push of $REPO_URL:$TAG failed after $attempt attempts" >&2
+          exit 1
+        fi
+        echo "attempt $attempt failed; retrying in 15 s"; sleep 15
+      done
     EOT
   }
 }
