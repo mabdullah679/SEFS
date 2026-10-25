@@ -33,8 +33,17 @@ mkfix() {
  "backup_vault_name":{"value":"sefs-vault"},"backup_plan_id":{"value":"plan-1"},"cluster_name":{"value":"sefs"},
  "writer_service_name":{"value":"sefs-writer"},"reader_service_name":{"value":"sefs-reader"},
  "writer_log_group":{"value":"/ecs/sefs/writer"},"reader_log_group":{"value":"/ecs/sefs/reader"},
- "reader_task_definition_arn":{"value":"arn:aws:ecs:us-east-1:$ACC:task-definition/sefs-reader:1"}}
+ "reader_task_definition_arn":{"value":"arn:aws:ecs:us-east-1:$ACC:task-definition/sefs-reader:1"},
+ "alarm_names":{"value":["sefs-reader-no-running-task","sefs-writer-no-running-task","sefs-efs-burst-credits-low"]}}
 EOF
+  cat >"$d/cloudwatch.describe-alarms.json" <<'EOF'
+{"MetricAlarms":[
+ {"AlarmName":"sefs-reader-no-running-task","AlarmActions":["arn:aws:sns:us-east-1:111122223333:sefs-alerts"]},
+ {"AlarmName":"sefs-writer-no-running-task","AlarmActions":["arn:aws:sns:us-east-1:111122223333:sefs-alerts"]},
+ {"AlarmName":"sefs-efs-burst-credits-low","AlarmActions":["arn:aws:sns:us-east-1:111122223333:sefs-alerts"]}]}
+EOF
+  echo '{"clusters":[{"clusterName":"sefs","settings":[{"name":"containerInsights","value":"enabled"}]}]}' >"$d/ecs.describe-clusters.json"
+  echo '{"DashboardName":"sefs-overview","DashboardBody":"{}"}' >"$d/cloudwatch.get-dashboard.json"
   cat >"$d/tf-console.txt" <<'EOF'
 var.region "us-east-1"
 var.name "sefs"
@@ -164,7 +173,11 @@ scenario() {
 }
 J() { local f="$1" q="$2"; jq "$q" "$f" >"$f.tmp" && mv "$f.tmp" "$f"; }
 
-scenario good ":" 0 "R2 PASS" "R3 PASS" "R4 PASS" "R5 PASS" "R6 PASS" "R7 PASS" "R8 PASS" "R9 PASS" "R10 PASS" "R12 PASS" "R13 PASS" "R14 PASS" "R15 PASS" "CTR PASS" "DRIFT PASS"
+scenario good ":" 0 "R2 PASS" "R3 PASS" "R4 PASS" "R5 PASS" "R6 PASS" "R7 PASS" "R8 PASS" "R9 PASS" "R10 PASS" "R12 PASS" "R13 PASS" "R14 PASS" "R15 PASS" "CTR PASS" "OBS PASS" "DRIFT PASS"
+scenario alarm_missing    "J cloudwatch.describe-alarms.json '.MetricAlarms |= .[:2]'" 1 "OBS FAIL"
+scenario alarm_no_action  "J cloudwatch.describe-alarms.json '.MetricAlarms[0].AlarmActions=[]'" 1 "OBS FAIL"
+scenario insights_off     "J ecs.describe-clusters.json '.clusters[0].settings[0].value=\"disabled\"'" 1 "OBS FAIL"
+scenario legacy_no_obs    "J tf-output.json 'del(.alarm_names)'" 1 "OBS UNVERIFIED"
 scenario sg_efs_cidr      "J ec2.describe-security-group-rules.sg-e.json '.SecurityGroupRules += [{IsEgress:false,IpProtocol:\"tcp\",FromPort:2049,ToPort:2049,CidrIpv4:\"10.0.0.0/8\"}]'" 1 "R9 FAIL"
 scenario sg_efs_from_cidr "J ec2.describe-security-group-rules.sg-e.json '.SecurityGroupRules[0] |= (del(.ReferencedGroupInfo) | .CidrIpv4=\"0.0.0.0/0\")'" 1 "R9 FAIL"
 scenario reader_rw_mount  "J ecs.describe-task-definition.reader.json '.taskDefinition.containerDefinitions[0].mountPoints[0].readOnly=false'" 1 "R3 FAIL"

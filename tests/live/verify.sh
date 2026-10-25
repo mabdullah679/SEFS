@@ -299,6 +299,25 @@ begin
 check "EFS automatic backup policy DISABLED" '.BackupPolicy.Status == "DISABLED"' "$EFSBK"
 report CTR "EFS automatic backups DISABLED (no untracked default vault)"
 
+# ---------------------------------------------------------------- OBS (observability child)
+begin
+ALARM_NAMES="$(o alarm_names)"
+if [ -z "$ALARM_NAMES" ]; then
+  unv "observability not deployed (no alarm_names output); apply module.observability"
+else
+  fetch ALARMS cloudwatch describe-alarms --alarm-name-prefix "$NAME-"
+  if [ -n "$ALARMS" ]; then
+    for an in $ALARM_NAMES; do
+      if jq -e --arg n "$an" '.MetricAlarms[] | select(.AlarmName==$n) | (.AlarmActions | length) > 0' >/dev/null <<<"$ALARMS"; then ok; else bad "alarm $an missing or has no action"; fi
+    done
+  else unv "describe-alarms failed"; fi
+  fetch CLUS ecs describe-clusters --clusters "$CLUSTER" --include SETTINGS
+  check "Container Insights enabled on the cluster" '.clusters[0].settings[]? | select(.name=="containerInsights") | .value == "enabled" or .value == "enhanced"' "$CLUS"
+  fetch DASH cloudwatch get-dashboard --dashboard-name "$NAME-overview"
+  check "dashboard $NAME-overview exists" '.DashboardName != null' "$DASH"
+fi
+report OBS "alarms wired to SNS, Container Insights on, dashboard present"
+
 # ---------------------------------------------------------------- drift
 begin
 set +e
