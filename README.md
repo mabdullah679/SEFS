@@ -23,7 +23,7 @@ Nothing here is emulated at deploy time: it needs a **real AWS account**. Images
 
 - Terraform ≥ 1.9 (tested 1.9.8; provider `hashicorp/aws` 6.70.0 pinned in [.terraform.lock.hcl](.terraform.lock.hcl))
 - Docker with `buildx` (tested Docker 29.8.2, arm64 host). Images are `linux/arm64`; an x86 host builds them under emulation (slower, works)
-- AWS CLI v2, signed in to the target account (`aws sts get-caller-identity` works) with rights to create VPC, EFS, ECS, ECR, IAM, AWS Backup, CloudWatch Logs
+- AWS CLI v2, signed in to the target account. **If you sign in with `aws login`** (session profiles): Terraform 1.9's S3 backend can't read that profile type, so run `make tf-profile SOURCE=<that profile>` once and work with `AWS_PROFILE=sefs-tf` (a `credential_process` helper over the same login; nothing stored). `setup.sh` does this automatically and `make preflight` refuses to run without it (`aws sts get-caller-identity` works) with rights to create VPC, EFS, ECS, ECR, IAM, AWS Backup, CloudWatch Logs
 - `make` and `bash`. macOS/Linux as-is; on Windows use WSL2
 - No inbound ports, no domain, no load balancer
 

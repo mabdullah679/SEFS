@@ -5,6 +5,7 @@ One command builds, in a real AWS account: a private network across 2 data cente
 It implements the spec "Shared EFS for Multi-App.docx". The 15 requirements are numbered R1 to R15 in PLAN.md.
 
 WHAT YOU NEED
+If you sign in to AWS with the newer aws login command, Terraform's state storage can't read that kind of login directly. setup.sh fixes this by creating a small helper profile called sefs-tf that passes the same login through; nothing is stored. If you skip setup.sh, run make tf-profile SOURCE=<your login profile> and then use AWS_PROFILE=sefs-tf.
 Terraform 1.9 or newer, Docker, the AWS CLI logged into the account, make and bash (on Windows, use WSL2). You don't need Java, Maven or Python; the apps are built inside Docker. Your internet upload needs to handle about 290 MB of app images within 20 minutes per attempt (three attempts), roughly 250 KB/s or better. On a healthy link the push takes under 7 minutes; on a 35 KB/s link it crawled for over two hours and failed, so the deploy now gives up instead of hanging. Nothing listens on your machine.
 
 HOW TO RUN

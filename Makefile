@@ -5,7 +5,7 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help setup test-setup bruno-profile bruno bootstrap preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
+.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -16,7 +16,14 @@ setup: ## Fresh clone: host checks, confirm AWS account, store secrets in SSM, d
 test-setup: ## Prove setup.sh never leaks a secret (fake aws, no AWS calls)
 	bash tests/setup/selftest.sh
 
+tf-profile: ## If you sign in with `aws login`: make tf-profile SOURCE=<login profile>, then use AWS_PROFILE=sefs-tf
+	@test -n "$(SOURCE)" || { echo "usage: make tf-profile SOURCE=<your AWS login profile>"; exit 1; }
+	bash scripts/bruno-profile.sh tf "$(SOURCE)" "$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
+
 preflight: ## Check host tools and show which AWS account/region you're about to touch
+	@if [ -n "$$(aws configure get login_session --profile "$${AWS_PROFILE:-default}" 2>/dev/null)" ]; then \
+	  echo "Refusing: profile '$${AWS_PROFILE:-default}' is an 'aws login' session, which Terraform 1.9's S3 backend cannot read."; \
+	  echo "Fix: make tf-profile SOURCE=$${AWS_PROFILE:-default}   then   export AWS_PROFILE=sefs-tf"; exit 1; fi
 	@test -f account.auto.tfvars || { echo "Refusing: create account.auto.tfvars with allowed_account_id = \"<12-digit id>\" (the ONLY account to deploy into)"; exit 1; }
 	@want=$$(sed -nE 's/^allowed_account_id *= *"([0-9]{12})".*/\1/p' account.auto.tfvars); have=$$(aws sts get-caller-identity --query Account --output text); \
 	  [ -n "$$want" ] && [ "$$want" = "$$have" ] || { echo "Refusing: credentials are account $$have, allowed is '$$want'"; exit 1; }; echo "Account guard OK: $$have"

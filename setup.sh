@@ -60,6 +60,13 @@ azs="$(aws ec2 describe-availability-zones --region "$region" --query 'length(Av
 [ "$azs" -ge 2 ] || die "Region $region has $azs AZs; the design needs at least 2"
 ok "$region has $azs AZs"
 
+src_profile="${AWS_PROFILE:-default}"
+if [ -n "$(aws configure get login_session --profile "$src_profile" 2>/dev/null)" ]; then
+  bash scripts/bruno-profile.sh tf "$src_profile" "$region" "$NAME" >/dev/null
+  export AWS_PROFILE="$NAME-tf"
+  ok "'$src_profile' is an 'aws login' session; Terraform will use helper profile '$NAME-tf' (same login, no stored keys)"
+fi
+
 echo "== 3/6 local config (git-ignored)"
 if [ -f account.auto.tfvars ] && ! grep -q "\"$acct\"" account.auto.tfvars; then
   warn "account.auto.tfvars points at a different account; replacing it"
@@ -110,7 +117,6 @@ else
 fi
 
 echo "== 5b/6 Bruno profile (no credentials stored)"
-src_profile="${AWS_PROFILE:-default}"
 bash scripts/bruno-profile.sh install "$src_profile" "$region" "$NAME" >/dev/null && ok "AWS profile '$NAME-bruno' assumes the read-only role via '$src_profile'"
 
 echo "== 6/6 deploy"
