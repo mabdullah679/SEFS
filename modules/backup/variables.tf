@@ -13,6 +13,11 @@ variable "resource_arns" {
 variable "retention_days" {
   description = "Retention; MUST validate >= 35 (R14)."
   type        = number
+
+  validation {
+    condition     = var.retention_days >= 35
+    error_message = "retention_days must be at least 35 (R14)."
+  }
 }
 
 variable "kms_key_arn" {

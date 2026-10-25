@@ -2,26 +2,26 @@
 
 output "vault_name" {
   description = "Backup vault name."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_backup_vault.this.name
 }
 
 output "vault_arn" {
   description = "Backup vault ARN."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_backup_vault.this.arn
 }
 
 output "plan_id" {
   description = "Backup plan ID."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_backup_plan.this.id
 }
 
 output "selection_id" {
   description = "Backup selection ID."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_backup_selection.this.id
 }
 
 output "role_arn" {
   description = "IAM role AWS Backup assumes."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_iam_role.backup.arn
 }
 
