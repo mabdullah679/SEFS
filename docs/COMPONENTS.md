@@ -1,0 +1,18 @@
+# Components → child Terraform
+
+The mother ([../main.tf](../main.tf)) deploys every child in one apply: `make up`.
+To update **one** component, apply only its child: `make apply-one CHILD=<child>` (= `terraform apply -target=module.<child>`). Terraform also applies whatever that child depends on, if it has changed.
+
+| Component | Child (`CHILD=`) | Code | Note |
+|---|---|---|---|
+| VPC, subnets, IGW, NAT, routes | `network` | [modules/network](../modules/network) | Changing `az_count` adds/removes mount targets too (efs depends on it) |
+| sg-apps, sg-efs, port-2049 rule | `security` | [modules/security](../modules/security) | |
+| EFS file system, mount targets, access points, FS policy, IA lifecycle | `efs` | [modules/efs](../modules/efs) | `prevent_destroy`: any change that would *replace* the file system fails on purpose |
+| AWS Backup vault, plan, selection, role | `backup` | [modules/backup](../modules/backup) | |
+| ECR repos + image build/push | `images` | [modules/images](../modules/images) | Rebuilds only when files in `apps/*` change |
+| ECS cluster, task defs, roles, services, logs | `apps` | [modules/apps](../modules/apps) | Safe to destroy/recreate; data stays on EFS |
+
+## Mother vs. granular
+- **Whole deployment / larger scale:** use the mother. One state, one apply, one plan that shows every change across children.
+- **Granular:** `-target` one child at a time, in the order above. Terraform documents `-target` for exceptional use, so run a full `make plan` afterwards to confirm the mother sees no leftover drift.
+- Destroying only the apps: `terraform destroy -target=module.apps`. This also removes the EFS file-system policy (it references the task roles), and the next apply re-creates it before the services start.
