@@ -54,24 +54,10 @@ run "r12_encrypted_generalpurpose_bursting" {
 # R13 null -> AWS-managed key: kms_key_id is optional+computed, so it is
 # UNKNOWN at plan when unset and cannot be asserted null here. Covered live
 # (verify.sh R13 resolves KmsKeyId against alias/aws/elasticfilesystem).
-run "r13_cmk_passed_through" {
-  command = plan
-  module {
-    source = "./modules/efs"
-  }
-  variables {
-    kms_key_arn = "arn:aws:kms:us-east-1:111122223333:key/11111111-2222-3333-4444-555555555555"
-  }
-
-  assert {
-    condition     = aws_efs_file_system.this.kms_key_id == "arn:aws:kms:us-east-1:111122223333:key/11111111-2222-3333-4444-555555555555"
-    error_message = "R13: a supplied CMK ARN must be set as kms_key_id."
-  }
-  assert {
-    condition     = aws_efs_file_system.this.encrypted == true
-    error_message = "R13: CMK requires encrypted = true."
-  }
-}
+# r13_cmk_passed_through lives in apply/efs_wiring.tftest.hcl: if the CMK
+# wiring is broken, kms_key_id becomes computed and is UNKNOWN at plan, so a
+# plan-mode assert errors ("Unknown condition value") instead of failing.
+# The mutation harness only counts assertion failures, so it must be apply.
 
 run "r15_ia_after_30_days" {
   command = plan

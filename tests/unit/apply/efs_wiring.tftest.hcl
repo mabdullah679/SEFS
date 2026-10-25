@@ -78,3 +78,22 @@ run "efs_children_share_one_file_system" {
     error_message = "AP ARN outputs must point at the right access points (apps scopes IAM on them)."
   }
 }
+
+run "r13_cmk_passed_through" {
+  command = apply
+  module {
+    source = "./modules/efs"
+  }
+  variables {
+    kms_key_arn = "arn:aws:kms:us-east-1:111122223333:key/11111111-2222-3333-4444-555555555555"
+  }
+
+  assert {
+    condition     = aws_efs_file_system.this.kms_key_id == "arn:aws:kms:us-east-1:111122223333:key/11111111-2222-3333-4444-555555555555"
+    error_message = "R13: a supplied CMK ARN must be set as kms_key_id."
+  }
+  assert {
+    condition     = aws_efs_file_system.this.encrypted == true
+    error_message = "R13: CMK requires encrypted = true."
+  }
+}
