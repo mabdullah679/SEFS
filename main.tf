@@ -103,5 +103,25 @@ module "registry" {
     reader_service_name    = module.apps.reader_service_name
     writer_log_group       = module.apps.writer_log_group
     reader_log_group       = module.apps.reader_log_group
+    alerts_topic_arn       = module.observability.alerts_topic_arn
+    dashboard_name         = module.observability.dashboard_name
   }
+}
+
+# Observability: alarms -> SNS, dashboard, log-derived metrics. Update with `make apply-one CHILD=observability`.
+module "observability" {
+  source = "./modules/observability"
+
+  name                         = var.name
+  region                       = var.region
+  cluster_name                 = module.apps.cluster_name
+  writer_service_name          = module.apps.writer_service_name
+  reader_service_name          = module.apps.reader_service_name
+  file_system_id               = module.efs.file_system_id
+  nat_gateway_ids              = module.network.nat_gateway_ids
+  writer_log_group             = module.apps.writer_log_group
+  reader_log_group             = module.apps.reader_log_group
+  backup_vault_name            = module.backup.vault_name
+  alert_email                  = var.alert_email
+  activate_cost_allocation_tag = var.activate_cost_allocation_tag
 }

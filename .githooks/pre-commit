@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Refuse to commit any file larger than MAX_KB (default 5 MB). Large artefacts belong in
+# S3/ECR, never in Git. Override once with: SEFS_ALLOW_LARGE=1 git commit ...
+MAX_KB="${SEFS_MAX_FILE_KB:-5120}"
+[ -n "${SEFS_ALLOW_LARGE:-}" ] && exit 0
+fail=0
+while IFS= read -r -d '' f; do
+  [ -f "$f" ] || continue
+  kb=$(( $(wc -c < "$f") / 1024 ))
+  if [ "$kb" -gt "$MAX_KB" ]; then echo "pre-commit: $f is ${kb} KB (> ${MAX_KB} KB). Not committing large files."; fail=1; fi
+done < <(git diff --cached --name-only --diff-filter=AM -z)
+exit $fail

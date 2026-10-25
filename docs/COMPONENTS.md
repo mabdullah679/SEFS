@@ -11,6 +11,9 @@ To update **one** component, apply only its child: `make apply-one CHILD=<child>
 | AWS Backup vault, plan, selection, role | `backup` | [modules/backup](../modules/backup) | |
 | ECR repos + image build/push | `images` | [modules/images](../modules/images) | Rebuilds only when files in `apps/*` change |
 | ECS cluster, task defs, roles, services, logs | `apps` | [modules/apps](../modules/apps) | Safe to destroy/recreate; data stays on EFS |
+| Alarms, SNS alerts topic, dashboard, log metric filters, cost allocation tag (opt-in) | `observability` | [modules/observability](../modules/observability) | `alert_email` subscribes an address (confirm the SNS email once) |
+| Bruno read-only role | `access` | [modules/access](../modules/access) | |
+| Deployed IDs in SSM `/sefs/outputs/*` | `registry` | [modules/registry](../modules/registry) | Non-secret only |
 
 ## Mother vs. granular
 - **Whole deployment / larger scale:** use the mother. One state, one apply, one plan that shows every change across children.

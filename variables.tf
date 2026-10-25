@@ -116,3 +116,15 @@ variable "image_build_timeout_seconds" {
   type        = number
   default     = 1200
 }
+
+variable "alert_email" {
+  description = "Email for CloudWatch alarm notifications (SNS). null = no subscription."
+  type        = string
+  default     = null
+}
+
+variable "activate_cost_allocation_tag" {
+  description = "Activate the Project cost allocation tag (needs billing permissions; opt-in)."
+  type        = bool
+  default     = false
+}

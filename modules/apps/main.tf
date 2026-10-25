@@ -44,6 +44,12 @@ locals {
 
 resource "aws_ecs_cluster" "this" {
   name = var.name
+
+  # Container Insights feeds RunningTaskCount / CPU / memory to modules/observability.
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 }
 
 resource "aws_cloudwatch_log_group" "writer" {

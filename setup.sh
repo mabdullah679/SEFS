@@ -48,6 +48,8 @@ awsv="$(aws --version 2>&1 | awk '{print $1}' | cut -d/ -f2)"
 ok "aws cli $awsv"
 if command -v bru >/dev/null 2>&1; then ok "bru $(bru --version) (Bruno CLI)"; else warn "bru not installed; the Bruno collection still works in the Bruno app (npm i -g @usebruno/cli for the CLI)"; fi
 
+git config core.hooksPath .githooks && ok "git hooks enabled (.githooks/pre-commit refuses files > 5 MB)"
+
 echo "== 2/6 AWS identity"
 ident="$(aws sts get-caller-identity --output json 2>/dev/null)" || die "No usable AWS credentials. Sign in first (aws login / aws sso login / aws configure), then re-run."
 acct="$(jq -r .Account <<<"$ident")"; arn="$(jq -r .Arn <<<"$ident")"

@@ -17,3 +17,6 @@ output "region" { value = var.region }
 output "name" { value = var.name }
 output "bruno_reader_role_arn" { value = module.access.role_arn }
 output "ssm_prefix" { value = module.access.ssm_prefix }
+output "alerts_topic_arn" { value = module.observability.alerts_topic_arn }
+output "dashboard_url" { value = module.observability.dashboard_url }
+output "alarm_names" { value = module.observability.alarm_names }

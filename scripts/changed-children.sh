@@ -16,7 +16,7 @@
 #   anything else             -> full  (fail safe: unknown means "redeploy everything")
 set -euo pipefail
 base="${1:?base ref}"; head="${2:?head ref}"
-ORDER=(network security efs backup images apps access registry)
+ORDER=(network security efs backup images apps observability access registry)
 
 full=0; want=" "   # portable to bash 3.2 (macOS): no associative arrays
 while IFS= read -r f; do
