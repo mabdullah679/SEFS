@@ -81,6 +81,7 @@ m25 ::: R8 ::: modules/apps/main.tf ::: sub@1 ::: security_groups  = [var.apps_s
 m26 ::: R10 ::: modules/efs/main.tf ::: sub ::: uid = var.reader_uid ::: uid = var.writer_uid ::: tests/unit/efs.tftest.hcl::r10_access_points_posix_and_same_root
 m27 ::: R13 ::: modules/efs/main.tf ::: sub ::: kms_key_id = var.kms_key_arn ::: kms_key_id = null ::: tests/unit/apply/efs_wiring.tftest.hcl::r13_cmk_passed_through
 m28 ::: R3 ::: modules/efs/main.tf ::: sub ::: policy         = module.fs_policy.json ::: policy         = jsonencode({ Version = "2012-10-17", Statement = [] }) ::: tests/unit/apply/efs_wiring.tftest.hcl::r03_fs_policy_attached_to_shared_fs
+m29 ::: CTR ::: modules/efs/main.tf ::: sub ::: status = "DISABLED" ::: status = "ENABLED" ::: tests/unit/efs.tftest.hcl::efs_automatic_backups_disabled
 EOF
 
 # Apply one mutation in place to $1 (a temp copy). Prints nothing on success.
