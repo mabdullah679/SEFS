@@ -1,7 +1,7 @@
 # TRACEABILITY — requirement → code → proof
 
 Owner: verification. Requirement IDs are defined in [../PLAN.md](../PLAN.md) §1; contract in [CONTRACTS.md](CONTRACTS.md).
-Observed against branch `agent/verify` after merging `main` (all six children present), 2026-10-25.
+Observed against branch `agent/verify` at `c0b4ae6` (main `ea51857` merged, all six children present), 2026-10-25.
 "Ran" columns say what was actually executed in this session; everything on real AWS is **not yet run** (no AWS calls were made).
 
 ## How to run each layer
@@ -9,7 +9,7 @@ Observed against branch `agent/verify` after merging `main` (all six children pr
 | Layer | Command | Needs AWS | Status 2026-10-25 |
 |---|---|---|---|
 | Unit (mock + offline policy render) | `bash tests/unit/run.sh` | No (HTTP(S)_PROXY blackholed) | ran: 23/23 main + 4/4 apply suite + R4 static = green |
-| Mutation | `bash tests/mutation/run.sh [tree] [id...]` | No | ran on `e62fc7a`: 27/27 KILLED (assertion-based) + no-op control SURVIVED; m29 added after and run alone: KILLED. 28 rows total |
+| Mutation | `bash tests/mutation/run.sh [tree] [id...]` | No | ran on `c0b4ae6` (main incl. compute name_prefix): 28/28 KILLED (assertion-based) + no-op control SURVIVED |
 | Live verifier self-test | `bash tests/live/selftest.sh` | No (stub `aws`/`terraform`) | ran: 24/24 scenarios behaved |
 | Live verifier | `bash tests/live/verify.sh` | Yes, read-only | **not run** (waits for `make up` + owner AWS gate) |
 | E2E behaviour | `E2E_CONFIRM=yes bash tests/live/e2e.sh` | Yes, **writes** | **not run** |
