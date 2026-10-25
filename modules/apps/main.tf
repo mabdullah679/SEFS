@@ -70,13 +70,22 @@ resource "aws_iam_role_policy_attachment" "execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Task roles use name_prefix, not a fixed name. The EFS file-system policy
+# names these roles by ARN in Principal; AWS stores the role's unique principal
+# ID, not the ARN. A fixed name means a replaced role keeps the same ARN, so
+# Terraform sees no diff on the FS policy while AWS's stored ID points at the
+# deleted role, and the app is locked out of EFS. A prefix gives every
+# replacement a new ARN, which forces the FS policy to update in the same apply.
+# (IAM User Guide, "AWS JSON policy elements: Principal" > IAM role principals.)
+# Prefix max is 38 chars (64 - 26-char unique suffix), enforced on var.name.
+# The execution role is not named in any resource policy, so it keeps a fixed name.
 resource "aws_iam_role" "writer" {
-  name               = "${local.writer_name}-task"
+  name_prefix        = "${local.writer_name}-task-"
   assume_role_policy = local.ecs_tasks_assume
 }
 
 resource "aws_iam_role" "reader" {
-  name               = "${local.reader_name}-task"
+  name_prefix        = "${local.reader_name}-task-"
   assume_role_policy = local.ecs_tasks_assume
 }
 
