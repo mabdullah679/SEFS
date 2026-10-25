@@ -5,7 +5,7 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help setup test-setup bruno-profile bruno preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
+.PHONY: help setup test-setup bruno-profile bruno bootstrap preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -25,8 +25,17 @@ preflight: ## Check host tools and show which AWS account/region you're about to
 	@aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output table
 	@echo "Region: $$($(TF) console <<< 'var.region' 2>/dev/null || echo us-east-1)"
 
-init:
-	$(TF) init -input=false
+bootstrap: ## One-time per account+region: state bucket + lock table (+ GitHub deploy role if GITHUB_REPO=owner/repo); writes backend.hcl
+	cd bootstrap && $(TF) init -input=false >/dev/null && $(TF) apply $(APPROVE) \
+	  -var "name=$$(sed -nE 's/^name *= *"([^"]+)".*/\1/p' ../account.auto.tfvars | grep . || echo sefs)" \
+	  -var "region=$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' ../account.auto.tfvars)" \
+	  -var "allowed_account_id=$$(sed -nE 's/^allowed_account_id *= *"([0-9]+)".*/\1/p' ../account.auto.tfvars)" \
+	  $(if $(GITHUB_REPO),-var "github_repo=$(GITHUB_REPO)",)
+	cd bootstrap && $(TF) output -raw backend_hcl > ../backend.hcl && echo "backend.hcl written"
+
+init: ## terraform init against the shared S3 state (needs backend.hcl from `make bootstrap`)
+	@test -f backend.hcl || { echo "Refusing: backend.hcl missing. Run 'make bootstrap' once (creates the state bucket + lock table)."; exit 1; }
+	$(TF) init -input=false -backend-config=backend.hcl -migrate-state -force-copy
 
 up: preflight init ## Deploy everything with ONE terraform apply (AUTO=1 to skip the prompt)
 	$(TF) apply $(APPROVE)
@@ -40,7 +49,7 @@ plan: init
 
 test: test-unit test-mutation test-contract test-setup ## All local (fake-AWS + Docker) proofs
 
-test-unit: ## terraform test against mocked AWS
+test-unit: ## terraform test against mocked AWS (offline, -backend=false)
 	bash tests/unit/run.sh
 
 test-mutation: ## Break each guard in a temp copy; every mutation must be caught
@@ -62,5 +71,5 @@ verify: ## Real AWS: every R-ID checked against live state + plan shows no drift
 e2e: ## Real AWS: write/read, IAM ro mutation, persistence across app destroy
 	bash tests/live/e2e.sh
 
-down: ## Destroy EVERYTHING incl. the EFS data. Requires CONFIRM_DESTROY_DATA=yes
+down: init ## Destroy EVERYTHING incl. the EFS data (keeps state bucket unless DESTROY_STATE=yes). Requires CONFIRM_DESTROY_DATA=yes
 	bash scripts/teardown.sh

@@ -82,3 +82,15 @@ echo "(advisory) tagging API still lists $lag ARN(s) for Project=$name; it lags 
 
 if [[ $fail -ne 0 ]]; then echo "NOT CLEAN"; exit 2; fi
 echo "CLEAN: no $name resources remain in $region"
+
+# The state bucket, lock table and CI role are NOT part of `make down`: the next `make up`
+# needs them. DESTROY_STATE=yes removes them too (versioned bucket included).
+if [[ "${DESTROY_STATE:-}" == "yes" ]]; then
+  echo "--- DESTROY_STATE=yes: removing the state bucket, lock table and CI role ---"
+  ( cd bootstrap && $TF init -input=false >/dev/null \
+      && $TF apply -auto-approve -var allow_state_destroy=true -var "region=$region" -var "name=$name" >/dev/null \
+      && $TF destroy -auto-approve -var allow_state_destroy=true -var "region=$region" -var "name=$name" )
+  rm -f backend.hcl
+  aws s3api head-bucket --bucket "$name-tfstate-$(aws sts get-caller-identity --query Account --output text)-$region" 2>/dev/null \
+    && { echo "LEFT state bucket"; exit 2; } || echo "clean state bucket"
+fi

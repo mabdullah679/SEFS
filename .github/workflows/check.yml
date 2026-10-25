@@ -5,7 +5,7 @@
 # Prerequisites (one-time, owner, see docs/CI.md):
 #   - remote Terraform state (S3 backend) shared with the owner's machine
 #   - an OIDC deploy role for this repo; its ARN in the repository variable AWS_DEPLOY_ROLE_ARN
-#   - repository variables AWS_REGION and AWS_ACCOUNT_ID (the account guard reads the latter)
+#   - repository variables AWS_REGION, AWS_ACCOUNT_ID (account guard), TF_STATE_BUCKET, TF_LOCK_TABLE
 name: check
 
 on:
@@ -59,7 +59,16 @@ jobs:
           base="${{ github.event.before }}"
           git cat-file -e "$base" 2>/dev/null || base="$(git rev-parse HEAD~1)"
           echo "children=$(bash scripts/changed-children.sh "$base" HEAD)" | tee -a "$GITHUB_OUTPUT"
-      - run: terraform init -input=false
+      - name: backend config from repository variables (written by `make bootstrap` locally)
+        run: |
+          cat > backend.hcl <<EOF
+          bucket         = "${{ vars.TF_STATE_BUCKET }}"
+          key            = "sefs/terraform.tfstate"
+          region         = "${{ vars.AWS_REGION }}"
+          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
+          encrypt        = true
+          EOF
+      - run: terraform init -input=false -backend-config=backend.hcl
       - name: apply
         env: { CHILDREN: "${{ steps.diff.outputs.children }}" }
         run: |

@@ -90,6 +90,13 @@ m34 ::: BRU ::: modules/access/variables.tf ::: sub ::: length(var.name) <= 25 :
 m35 ::: BRU ::: modules/registry/main.tf ::: sub ::: type        = "String" ::: type        = "SecureString" ::: tests/unit/access.tftest.hcl::registry_publishes_plain_string_params_under_prefix
 m36 ::: BRU ::: modules/access/main.tf ::: sub ::: Resource = ["${local.arn}:backup:${var.region}:${local.account}:backup-plan:*", "${local.arn}:backup:${var.region}:${local.account}:backup-vault:${var.name}*"] ::: Resource = "*" ::: tests/unit/access.tftest.hcl::access_wildcard_resource_only_for_unscopable_describes
 m37 ::: BRU ::: modules/access/main.tf ::: sub ::: max_session_duration = 3600 ::: max_session_duration = 43200 ::: tests/unit/access.tftest.hcl::access_trust_defaults_to_this_account_only
+m38 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: status = "Enabled" ::: status = "Suspended" ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only
+m39 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: block_public_acls       = true ::: block_public_acls       = false ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only
+m40 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: "repo:${var.github_repo}:ref:refs/heads/${var.github_branch}" ::: "repo:${var.github_repo}:*" ::: tests/unit/bootstrap.tftest.hcl::github_role_trusts_exactly_one_repo_and_branch
+m41 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: policy/PowerUserAccess ::: policy/AdministratorAccess ::: tests/unit/bootstrap.tftest.hcl::github_role_iam_is_scoped_and_cannot_touch_itself
+m42 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: Resource = "arn:${local.partition}:iam::${local.account}:role/${var.name}-*" ::: Resource = "*" ::: tests/unit/bootstrap.tftest.hcl::github_role_iam_is_scoped_and_cannot_touch_itself
+m43 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: force_destroy = var.allow_state_destroy ::: force_destroy = true ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only
+m44 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: hash_key     = "LockID" ::: hash_key     = "ID" ::: tests/unit/bootstrap.tftest.hcl::lock_table_shape
 EOF
 
 # Apply one mutation in place to $1 (a temp copy). Prints nothing on success.

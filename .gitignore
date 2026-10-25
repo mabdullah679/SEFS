@@ -11,3 +11,7 @@ __pycache__/
 .env
 modules/**/.terraform.lock.hcl
 account.auto.tfvars
+backend.hcl
+bootstrap/.terraform/
+bootstrap/terraform.tfstate
+bootstrap/terraform.tfstate.backup

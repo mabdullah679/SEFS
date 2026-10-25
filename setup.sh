@@ -69,6 +69,11 @@ printf 'allowed_account_id = "%s"\nregion             = "%s"\n' "$acct" "$region
 git check-ignore -q account.auto.tfvars || die "account.auto.tfvars is NOT git-ignored; refusing to continue"
 ok "account.auto.tfvars written (allowed_account_id=$acct, region=$region)"
 
+echo "== 3b/6 shared Terraform state (S3 bucket + lock table, once per account+region)"
+gh_repo="$(ask "GitHub repo for CI deploys as owner/repo (blank = no CI role):")"
+if [ -n "$gh_repo" ]; then make bootstrap AUTO=1 GITHUB_REPO="$gh_repo"; else make bootstrap AUTO=1; fi
+ok "state backend ready: $(sed -nE 's/^bucket *= *"([^"]+)".*/\1/p' backend.hcl)"
+
 echo "== 4/6 secrets -> SSM SecureString (/$NAME/secrets/<name>)"
 count=0
 if [ -f "$MANIFEST" ]; then
@@ -96,8 +101,8 @@ fi
 [ "$count" -gt 0 ] && ok "$count secret(s) stored" || ok "no secrets to store (manifest empty); nothing in this deployment needs one"
 
 echo "== 5/6 configuration checks"
-terraform init -input=false >/dev/null
-terraform validate >/dev/null && ok "terraform validate"
+make init >/dev/null
+terraform validate >/dev/null && ok "terraform validate (shared state)"
 if [ "$FULL_TESTS" = 1 ]; then
   make test && ok "local proof suites green"
 else

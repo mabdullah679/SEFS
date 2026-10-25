@@ -1,0 +1,26 @@
+CI - PLAIN TWIN OF CI.md (2026-10-25)
+
+THE IDEA
+Set the project up once. After that, push to the main branch with the word "check" in the commit message and GitHub redeploys only what changed, confirms nothing drifted, and re-checks every requirement against live AWS.
+
+WHAT HAPPENS ON A "CHECK" PUSH
+1. On every push, the fake-AWS tests run (no AWS account needed).
+2. If the message contains "check": GitHub borrows the deploy role (no AWS keys stored in GitHub), works out which pieces changed from the file paths (a module folder means that module; app code means the images and the apps; a root Terraform file means everything; docs and tests mean nothing to deploy; anything unknown means everything, to be safe), applies just those pieces using the shared state, confirms Terraform then sees no leftover changes, and runs the live checker.
+Only one deploy runs at a time, and a lock stops a laptop deploy and a GitHub deploy from colliding.
+
+ONE-TIME SETUP (about 10 minutes)
+1. Run ./setup.sh and, when asked, give your GitHub repo as owner/repo. That creates the shared state storage (a private, versioned, encrypted bucket and a lock table) and a deploy role that only that repo's main branch can use. Keep the small bootstrap/terraform.tfstate file; it is the only record of the state bucket.
+2. In GitHub, under the repo's Actions variables, add: AWS_REGION, AWS_ACCOUNT_ID, AWS_DEPLOY_ROLE_ARN, TF_STATE_BUCKET, TF_LOCK_TABLE. The values come from the bootstrap outputs. No secrets are needed.
+3. Push to main with "check" in the message.
+
+AFTER SETUP
+make up, make apply-one and make down all use the shared state. The local tests never touch it.
+
+TEARDOWN
+make down removes the deployment but keeps the state storage and the deploy role, because the next deploy needs them. Add DESTROY_STATE=yes to remove those too.
+
+HONEST LIMITS
+- The deploy role is broad. It can create almost anything except change IAM outside this project's own roles, and it can never change itself. AWS gives no practical way to narrow a role that must create networks, storage, containers and backups. What really bounds it is that only one repo and one branch can use it, and GitHub never manages the setup pieces.
+- Applying one piece at a time is something Terraform warns about. The "no leftover changes" check after each run is what makes it safe here. If that check fails, the run fails and the next push should deploy everything.
+- Nothing has run on GitHub yet. Everything is tested locally with fake AWS. The first real "check" push is the proof and needs your repo.
+- GitHub's machines are not ARM, so app images build under emulation and from scratch each time, which is slower.
