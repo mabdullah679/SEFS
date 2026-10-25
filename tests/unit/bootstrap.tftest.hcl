@@ -38,9 +38,11 @@ mock_provider "aws" {
 }
 
 variables {
-  name        = "sefs-ut"
-  region      = "ap-southeast-2"
-  github_repo = "acme/sefs"
+  name            = "sefs-ut"
+  region          = "ap-southeast-2"
+  github_repo     = "acme/sefs"
+  github_owner_id = 1111
+  github_repo_id  = 2222
 }
 
 run "state_bucket_is_private_versioned_encrypted_tls_only" {
@@ -104,14 +106,24 @@ run "github_role_trusts_exactly_one_repo_and_branch" {
   assert {
     condition = (
       jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Action == "sts:AssumeRoleWithWebIdentity" &&
-      jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == "repo:acme/sefs:ref:refs/heads/main" &&
-      jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
+      jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com" &&
+      length(jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals) == 2
     )
-    error_message = "Trust must be StringEquals on sub=repo:<owner/repo>:ref:refs/heads/<branch> and aud=sts.amazonaws.com (no wildcards)."
+    error_message = "Trust must be StringEquals on aud=sts.amazonaws.com and sub only."
   }
   assert {
-    condition     = !can(regex("[*]", jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"]))
-    error_message = "The sub condition must not contain a wildcard."
+    condition = sort(tolist(jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"])) == sort(tolist([
+      "repo:acme/sefs:ref:refs/heads/main",
+      "repo:acme@1111/sefs@2222:ref:refs/heads/main",
+    ]))
+    error_message = "sub must be exactly the ID-pinned form (repo:owner@id/repo@id:ref:refs/heads/<branch>) plus the plain form, nothing else."
+  }
+  assert {
+    condition = alltrue([
+      for v in tolist(jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"]) :
+      can(regex("^repo:[^:*?]+:ref:refs/heads/[^*?]+$", v))
+    ])
+    error_message = "Every sub value must be an exact repo + branch string with no wildcard."
   }
 }
 

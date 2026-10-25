@@ -45,7 +45,9 @@ Already have a GitHub OIDC provider in the account? AWS allows one per issuer: r
 
 `CONFIRM_DESTROY_DATA=yes make down` removes the deployment but **keeps** the state bucket, lock table and CI role. Add `DESTROY_STATE=yes` to remove those too (the bucket is versioned, so this needs the explicit flag).
 
-## Two things learned the hard way
+## Three things learned the hard way
+
+- **GitHub's `sub` claim carries numeric IDs.** Observed 2026-10-25 on the first "check" run: `repo:mabdullah679@131607929/SEFS@1433201237:ref:refs/heads/main`, not the documented `repo:owner/repo:ref:...`. IAM therefore refused the ID-less trust ("Not authorized to perform sts:AssumeRoleWithWebIdentity"). The role now trusts the exact ID-pinned string (plus the plain form), still `StringEquals`, no wildcards; `make bootstrap` resolves both IDs with `gh api`. The workflow prints `iss/aud/sub` (never the token) before assuming the role so a future format change is visible in one glance.
 
 - **`aws login` sessions and the S3 backend.** Terraform 1.9's built-in backend cannot read the `login_session` profile type; the provider can. `make tf-profile SOURCE=<login profile>` creates `sefs-tf`, a `credential_process` helper that exports the same session, and `make preflight` refuses to run on a `login_session` profile. CI is unaffected (OIDC puts credentials in the environment).
 - **Offline suites after `make init`.** Once the S3 backend is initialised in `.terraform/`, `terraform init -backend=false` *reuses* it and demands credentials. The unit and mutation runners therefore set their own `TF_DATA_DIR`, so `make test` works with no AWS access at all.

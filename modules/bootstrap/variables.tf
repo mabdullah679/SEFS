@@ -47,3 +47,15 @@ variable "create_oidc_provider" {
   type        = bool
   default     = true
 }
+
+variable "github_owner_id" {
+  description = "Numeric GitHub owner (user/org) ID. GitHub's OIDC `sub` claim now carries IDs (repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:...), observed 2026-10-25; set both IDs so trust is pinned to this exact owner+repo, not just their names."
+  type        = number
+  default     = null
+}
+
+variable "github_repo_id" {
+  description = "Numeric GitHub repository ID (see github_owner_id)."
+  type        = number
+  default     = null
+}

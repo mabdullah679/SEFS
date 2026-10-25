@@ -37,7 +37,7 @@ bootstrap: ## One-time per account+region: state bucket + lock table (+ GitHub d
 	  -var "name=$$(sed -nE 's/^name *= *"([^"]+)".*/\1/p' ../account.auto.tfvars | grep . || echo sefs)" \
 	  -var "region=$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' ../account.auto.tfvars)" \
 	  -var "allowed_account_id=$$(sed -nE 's/^allowed_account_id *= *"([0-9]+)".*/\1/p' ../account.auto.tfvars)" \
-	  $(if $(GITHUB_REPO),-var "github_repo=$(GITHUB_REPO)",)
+	  $(if $(GITHUB_REPO),-var "github_repo=$(GITHUB_REPO)" -var "github_owner_id=$$(gh api repos/$(GITHUB_REPO) --jq .owner.id 2>/dev/null || echo null)" -var "github_repo_id=$$(gh api repos/$(GITHUB_REPO) --jq .id 2>/dev/null || echo null)",)
 	cd bootstrap && $(TF) output -raw backend_hcl > ../backend.hcl && echo "backend.hcl written"
 
 init: ## terraform init against the shared S3 state (needs backend.hcl from `make bootstrap`)
