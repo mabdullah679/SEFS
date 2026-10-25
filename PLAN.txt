@@ -1,5 +1,5 @@
 SEFS PLAN - PLAIN VERSION (twin of PLAN.md, updated 2026-10-25)
-Status (2026-10-25): built and proven locally, all local tests green. Nothing in AWS yet. AWS gets touched only after you say yes to the account, region and resource list.
+Status (2026-10-25): built and proven locally, all local tests green. Real AWS run completed and fully torn down on 2026-10-25; everything passed and the account was verified clean. Details in README.txt.
 
 WHAT THE SPEC ASKS FOR
 One shared AWS file system (EFS) that a Python app writes files to and a Spring Boot app reads from, built with Terraform.

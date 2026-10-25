@@ -20,7 +20,7 @@ Extra: EFS's built-in automatic backups stay off. Fake-AWS test, 1 break test, l
 Extra: code matches what's running: live only, Terraform must report no changes.
 
 GAPS, PLAINLY
-1. Nothing has run on real AWS yet. The live checker was only tested against made-up AWS responses. A mismatch would show as FAIL or UNVERIFIED, never as a false PASS.
+1. Real AWS ran on 2026-10-25 and everything passed. It exposed one bug in the checker (fixed). Still not covered live: a finished backup job, and a control run of the same test with the writer's role.
 2. AWS doesn't document which error a write gets when write permission is missing. The test accepts any of the three possible "denied" errors and records which one it saw.
 3. The reader's startup "write blocked" check only proves the read-only flag, not the real protection.
 4. During the live "destroy the apps" test, the file system briefly has no custom policy. Nothing can reach it in that window, because the storage firewall only admits the apps and they're gone.

@@ -1,7 +1,7 @@
 # SEFS — Implementation Plan (Shared EFS for Multi-App)
 
 Source: [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx) (full text extracted 2026-10-25; the 529 KB size is embedded fonts, there are no images or hidden sections).
-Status (2026-10-25): **built and proven locally** — unit, mutation (28/28) and Docker contract all green on main. **Real-AWS layer not run yet**; waits on the owner's account + consent.
+Status (2026-10-25): **built and proven locally** — unit, mutation (28/28) and Docker contract all green on main. **Real-AWS layer run and torn down 2026-10-25** (verify 15/15, e2e E1–E4 pass, account verified clean). See README.
 
 ---
 

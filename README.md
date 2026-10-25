@@ -94,7 +94,22 @@ make test-contract   # Docker: writer + reader on one volume, as their real UIDs
 | Unit | 23/23 plan-mode + 4/4 apply-mode (mocked) + static `prevent_destroy` check — all pass |
 | Mutation | 28/28 deliberate breaks caught (every R-ID with a code guard, plus "EFS auto-backups off"); a no-op control break correctly survives |
 | Contract (Docker) | 16/16 assertions pass; with the reader mounted rw the suite fails, as it should |
-| Live verifier / e2e | **Not run yet** — waits on an AWS account |
+| Live verifier / e2e | Run 2026-10-25 against real AWS (ap-southeast-2): `make verify` 15/15 PASS + zero drift (before and after the rebuild); `make e2e` E1–E4 all PASS. See below |
+
+### Live run (2026-10-25, account 445137568806, ap-southeast-2)
+
+| Proof | Result |
+|---|---|
+| `make up` from empty state | 55 resources, one apply, ~8 min |
+| `make verify` | 15/15 PASS; `terraform plan` exit 0 (no drift), re-checked after the apps were rebuilt |
+| E1 writer → reader | 40 files, every sha256 identical |
+| E3 reader write with `readOnly=false` | Denied. The kernel showed the mount `rw` and POSIX allowed the write (`drwxrwxr-x`, group 1000, reader gid 1000), so only the EFS file-system policy could refuse it |
+| E4 destroy + re-apply the apps | All 46 pre-existing files read back intact; file system unchanged |
+| `make down` | 54 destroyed + EFS deleted + inactive task definitions deleted; per-service sweep clean; account re-checked independently |
+
+Found only by the live run, since fixed: parallel `docker login` collided in the macOS keychain (-25299), leaving the first `make up` at 52/55; teardown missed INACTIVE task definitions; `verify.sh` misread `tostring(null)` as a configured CMK.
+
+**Not established:** the errno EFS returns for a missing `ClientWrite` is not documented by AWS. Observed here: `EROFS`. There is no control run of the same readOnly=false task using the *writer* role; E1 (the writer writing 40 files) is the nearest evidence. Backup jobs were not run (the daily schedule never fired in the test window), so R14 is proven as configuration, not as a completed backup.
 
 Requirement → code → test mapping: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 

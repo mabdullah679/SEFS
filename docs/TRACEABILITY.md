@@ -11,8 +11,8 @@ Observed against branch `agent/verify` at `c0b4ae6` (main `ea51857` merged, all 
 | Unit (mock + offline policy render) | `bash tests/unit/run.sh` | No (HTTP(S)_PROXY blackholed) | ran: 23/23 main + 4/4 apply suite + R4 static = green |
 | Mutation | `bash tests/mutation/run.sh [tree] [id...]` | No | ran on `c0b4ae6` (main incl. compute name_prefix): 28/28 KILLED (assertion-based) + no-op control SURVIVED |
 | Live verifier self-test | `bash tests/live/selftest.sh` | No (stub `aws`/`terraform`) | ran: 24/24 scenarios behaved |
-| Live verifier | `bash tests/live/verify.sh` | Yes, read-only | **not run** (waits for `make up` + owner AWS gate) |
-| E2E behaviour | `E2E_CONFIRM=yes bash tests/live/e2e.sh` | Yes, **writes** | **not run** |
+| Live verifier | `bash tests/live/verify.sh` | Yes, read-only | ran 2026-10-25 on live AWS: 15 PASS / 0 FAIL / 0 UNVERIFIED, twice (after deploy, after apps rebuild) |
+| E2E behaviour | `E2E_CONFIRM=yes bash tests/live/e2e.sh` | Yes, **writes** | ran 2026-10-25: E1–E4 PASS (E3 errno observed: EROFS) |
 | Module-level tests (child agents) | `terraform test` inside `modules/<child>` / `modules/*/tests/run_tests.sh` | No | owned by child agents; listed for cross-reference only |
 | POSIX contract (apps agent) | `bash tests/contract/run.sh` | No (Docker) | owned by apps agent |
 
@@ -44,8 +44,8 @@ Mutation verdict rules: KILLED only if the named run fails on a **test assertion
 
 ## Gaps, said plainly
 
-1. **Nothing on real AWS has run.** verify.sh and e2e.sh are written and syntax-checked; verify.sh's logic is proven only against stub fixtures whose JSON shapes come from AWS CLI documentation, not from a live response. First live run may surface a shape mismatch; it would show as FAIL/UNVERIFIED, not as a false PASS.
-2. **Which errno EFS returns for a missing ClientWrite is not established.** AWS docs say ClientMount "Provides read-only access" and ClientWrite "Provides write permissions" ([EFS IAM docs](https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html)) but name no errno. E3 accepts EACCES, EPERM or EROFS (any of them can only come from EFS IAM in that task, because the copy is `readOnly=false` and POSIX allows the write) and logs which one. The probe script's errno mapping was exercised locally in the real reader image (`sefs-contract-reader:test`): ro tmpfs → `DENIED EROFS`, 1001:1000 0775 dir → `ALLOWED` (so POSIX alone would not stop the reader), root 0755 dir → `DENIED EACCES`.
+1. **Live run done 2026-10-25** (see README). It found one verifier bug (tostring(null) read as a CMK; fixed). Not covered live: a completed AWS Backup job (R14 is configuration-proven only), and a writer-role control for E3.
+2. **Which errno EFS returns for a missing ClientWrite is undocumented; observed live: EROFS (mount reported rw, POSIX allowed the write).** AWS docs say ClientMount "Provides read-only access" and ClientWrite "Provides write permissions" ([EFS IAM docs](https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html)) but name no errno. E3 accepts EACCES, EPERM or EROFS (any of them can only come from EFS IAM in that task, because the copy is `readOnly=false` and POSIX allows the write) and logs which one. The probe script's errno mapping was exercised locally in the real reader image (`sefs-contract-reader:test`): ro tmpfs → `DENIED EROFS`, 1001:1000 0775 dir → `ALLOWED` (so POSIX alone would not stop the reader), root 0755 dir → `DENIED EACCES`.
 3. **E2 is not an R3 proof.** The reader's startup probe hits the readOnly mount flag (EROFS). Only E3 proves the IAM control.
 4. **A new, separately named CIDR ingress resource on sg-efs is invisible to unit tests** (terraform test cannot enumerate all resources of a type). Covered live by verify.sh R9 (counts every ingress rule on the group).
 5. **R13 null-key path** is live-only (see row).
