@@ -108,8 +108,8 @@ Collaboration without overwriting = **hard file ownership + contracts first + on
 | # | Item | State 2026-10-25 |
 |---|---|---|
 | Q1 | `setup.sh`: fresh-clone checks (tools, Docker, AWS identity), prompts for creds → SSM SecureString only, writes `account.auto.tfvars`, runs `make up` | not started |
-| Q2 | Bruno collection, self-hydrating from SSM via the read-only role. `modules/access` + `modules/registry` built, unit-tested (31/31), **not live-proven**; mutations m30–m37 added, run pending | collection not started |
-| Q3 | CI: push to `main` with "check" in the commit message → detect changed children (path → `module.<child>`), plan+apply only those, else full mother; verify after | not started; CI host to decide (GitHub Actions is the natural fit for a cloned client repo) |
+| Q2 | Bruno collection, self-hydrating from SSM via the read-only role | Collection written (22 requests, parsed by Bruno's parser). **Live-proven:** `modules/access` + `modules/registry` deployed; `sefs-bruno` profile assumed `sefs-bruno-reader` via credential_process (`sts get-caller-identity` returned the role). **Not proven:** `bru run` itself: the deploy's reader-image push failed on a ~35 KB/s uplink (owner's link), stack torn down by owner decision. Mutations m30–m37 killed 8/8. Re-run: `make up` → `make bruno` → negative control → `make verify` → `make down` when the uplink is healthy |
+| Q3 | CI on GitHub Actions (D20): push to `main` with "check" → changed children → apply only those, else full mother; verify after | 3a done: `scripts/changed-children.sh` (9-case selftest, mutation-proven) + `.github/workflows/check.yml`. **3b pending: remote Terraform state** (S3 + lock) shared between owner and CI; today state is local, so CI cannot run. **3c pending: OIDC deploy role** for the repo |
 | Q4 | Mutation-prove everything above as it lands | pending |
 
 Usage rule (owner, 2026-10-25): owner gates on `/usage`; small stoppable chunks; no agent fan-out without an explicit go.

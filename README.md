@@ -28,6 +28,7 @@ Nothing here is emulated at deploy time: it needs a **real AWS account**. Images
 - No inbound ports, no domain, no load balancer
 
 The host does **not** need Java, Maven or Python; both apps build inside Docker.
+- **Uplink:** `make up` pushes ~290 MB of images (writer 145 MB, reader 352 MB compressed to ~165 MB + ~120 MB layers). Each push attempt is bounded by a 20-minute watchdog with 3 attempts (`modules/images` variables `build_timeout_seconds`, `build_attempts`), so the link needs to sustain roughly ≥ 250 KB/s. Measured 2026-10-25: a healthy run pushed in under 7 min; a ~35 KB/s link crawled for 2 h 09 m and broke.
 
 ## Run it
 

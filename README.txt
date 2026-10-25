@@ -5,7 +5,7 @@ One command builds, in a real AWS account: a private network across 2 data cente
 It implements the spec "Shared EFS for Multi-App.docx". The 15 requirements are numbered R1 to R15 in PLAN.md.
 
 WHAT YOU NEED
-Terraform 1.9 or newer, Docker, the AWS CLI logged into the account, make and bash (on Windows, use WSL2). You don't need Java, Maven or Python; the apps are built inside Docker. Nothing listens on your machine.
+Terraform 1.9 or newer, Docker, the AWS CLI logged into the account, make and bash (on Windows, use WSL2). You don't need Java, Maven or Python; the apps are built inside Docker. Your internet upload needs to handle about 290 MB of app images within 20 minutes per attempt (three attempts), roughly 250 KB/s or better. On a healthy link the push takes under 7 minutes; on a 35 KB/s link it crawled for over two hours and failed, so the deploy now gives up instead of hanging. Nothing listens on your machine.
 
 HOW TO RUN
 Fresh clone, one command: ./setup.sh. It checks your tools, shows which AWS account you're logged into and asks you to confirm, writes the local account file, asks for any secrets the project lists (none today) and stores them only in AWS's parameter store as encrypted values, never on the command line or in Terraform's records, then deploys. make test-setup proves a secret can't leak, using a fake AWS.
