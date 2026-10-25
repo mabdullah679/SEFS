@@ -25,6 +25,17 @@ variable "transition_to_ia" {
   description = "IA transition (R15)."
   type        = string
   default     = "AFTER_30_DAYS"
+
+  # Allowed set copied from hashicorp/aws v6.70.0 docs, r/efs_file_system,
+  # lifecycle_policy.transition_to_ia (checked 2026-10-25).
+  validation {
+    condition = contains([
+      "AFTER_1_DAY", "AFTER_7_DAYS", "AFTER_14_DAYS", "AFTER_30_DAYS",
+      "AFTER_60_DAYS", "AFTER_90_DAYS", "AFTER_180_DAYS", "AFTER_270_DAYS",
+      "AFTER_365_DAYS",
+    ], var.transition_to_ia)
+    error_message = "transition_to_ia must be one of AFTER_1_DAY, AFTER_7_DAYS, AFTER_14_DAYS, AFTER_30_DAYS, AFTER_60_DAYS, AFTER_90_DAYS, AFTER_180_DAYS, AFTER_270_DAYS, AFTER_365_DAYS."
+  }
 }
 
 variable "shared_root_path" {
