@@ -20,3 +20,5 @@ output "ssm_prefix" { value = module.access.ssm_prefix }
 output "alerts_topic_arn" { value = module.observability.alerts_topic_arn }
 output "dashboard_url" { value = module.observability.dashboard_url }
 output "alarm_names" { value = module.observability.alarm_names }
+output "az_count" { value = var.az_count }
+output "kms_key_arn" { value = var.kms_key_arn }
