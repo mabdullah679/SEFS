@@ -32,8 +32,7 @@ plan: init
 test: test-unit test-mutation test-contract ## All local (fake-AWS + Docker) proofs
 
 test-unit: ## terraform test against mocked AWS
-	$(TF) init -input=false -backend=false >/dev/null
-	$(TF) test -test-directory=tests/unit
+	bash tests/unit/run.sh
 
 test-mutation: ## Break each guard in a temp copy; every mutation must be caught
 	bash tests/mutation/run.sh
