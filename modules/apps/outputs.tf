@@ -2,46 +2,46 @@
 
 output "cluster_name" {
   description = "ECS cluster name."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_ecs_cluster.this.name
 }
 
 output "writer_service_name" {
   description = "Writer ECS service name."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_ecs_service.writer.name
 }
 
 output "reader_service_name" {
   description = "Reader ECS service name."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_ecs_service.reader.name
 }
 
 output "writer_task_definition_arn" {
   description = "Writer task def ARN."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_ecs_task_definition.writer.arn
 }
 
 output "reader_task_definition_arn" {
   description = "Reader task def ARN."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_ecs_task_definition.reader.arn
 }
 
 output "writer_task_role_arn" {
   description = "Writer task role ARN (consumed by efs FS policy)."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_iam_role.writer.arn
 }
 
 output "reader_task_role_arn" {
   description = "Reader task role ARN (consumed by efs FS policy)."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_iam_role.reader.arn
 }
 
 output "writer_log_group" {
   description = "CloudWatch log group for writer."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_cloudwatch_log_group.writer.name
 }
 
 output "reader_log_group" {
   description = "CloudWatch log group for reader."
-  value       = null # OWNER: replace with real value; name is contract-fixed
+  value       = aws_cloudwatch_log_group.reader.name
 }
 
