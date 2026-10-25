@@ -105,8 +105,9 @@ resource "terraform_data" "build" {
         bpid=$!
         ( sleep "$BUILD_TIMEOUT" && kill "$bpid" 2>/dev/null && echo "watchdog: attempt $attempt exceeded $BUILD_TIMEOUT s, killed" ) &
         wpid=$!
-        if wait "$bpid"; then kill "$wpid" 2>/dev/null; break; fi
-        kill "$wpid" 2>/dev/null
+        # The watchdog may already have exited (it fired); a failed kill must not trip set -e.
+        if wait "$bpid"; then kill "$wpid" 2>/dev/null || true; break; fi
+        kill "$wpid" 2>/dev/null || true
         if [ "$attempt" -ge "$BUILD_ATTEMPTS" ]; then
           echo "build/push of $REPO_URL:$TAG failed after $attempt attempts" >&2
           exit 1
