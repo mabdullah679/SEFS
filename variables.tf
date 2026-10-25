@@ -93,3 +93,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "allowed_account_id" {
+  description = "The ONLY AWS account Terraform may touch. Required by `make up` (set in account.auto.tfvars, git-ignored)."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.allowed_account_id == null || can(regex("^[0-9]{12}$", var.allowed_account_id))
+    error_message = "allowed_account_id must be a 12-digit AWS account ID."
+  }
+}

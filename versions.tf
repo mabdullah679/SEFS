@@ -12,6 +12,10 @@ terraform {
 provider "aws" {
   region = var.region
 
+  # Account guard: Terraform errors before any change if the credentials resolve
+  # to any other account. `make up` refuses to run unless this is set.
+  allowed_account_ids = var.allowed_account_id == null ? null : [var.allowed_account_id]
+
   default_tags {
     tags = merge(var.tags, {
       Project   = var.name

@@ -11,6 +11,9 @@ help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
 
 preflight: ## Check host tools and show which AWS account/region you're about to touch
+	@test -f account.auto.tfvars || { echo "Refusing: create account.auto.tfvars with allowed_account_id = \"<12-digit id>\" (the ONLY account to deploy into)"; exit 1; }
+	@want=$$(sed -nE 's/^allowed_account_id *= *"([0-9]{12})".*/\1/p' account.auto.tfvars); have=$$(aws sts get-caller-identity --query Account --output text); \
+	  [ -n "$$want" ] && [ "$$want" = "$$have" ] || { echo "Refusing: credentials are account $$have, allowed is '$$want'"; exit 1; }; echo "Account guard OK: $$have"
 	@for t in $(TF) docker aws; do command -v $$t >/dev/null || { echo "MISSING: $$t"; exit 1; }; done
 	@docker info >/dev/null 2>&1 || { echo "Docker daemon not running"; exit 1; }
 	@aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output table

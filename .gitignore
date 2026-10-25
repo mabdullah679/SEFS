@@ -10,3 +10,4 @@ __pycache__/
 *.pyc
 .env
 modules/**/.terraform.lock.hcl
+account.auto.tfvars
