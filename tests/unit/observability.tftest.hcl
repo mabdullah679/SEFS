@@ -158,6 +158,13 @@ run "dashboard_covers_apps_efs_nat_and_errors" {
     error_message = "Dashboard must show running tasks, CPU, EFS credits and I/O, NAT errors and the reader-write-allowed counter."
   }
   assert {
+    condition = alltrue([
+      for w in jsondecode(aws_cloudwatch_dashboard.this.dashboard_body).widgets :
+      alltrue([for m in w.properties.metrics : can(m[0])])
+    ])
+    error_message = "Every dashboard metric entry must be an array (CloudWatch rejects a flat list: 'metrics has to be an array of array of strings')."
+  }
+  assert {
     condition     = aws_cloudwatch_dashboard.this.dashboard_name == "sefs-ut-overview" && length(aws_ce_cost_allocation_tag.project) == 0
     error_message = "Dashboard is <name>-overview; the cost allocation tag is opt-in (off by default)."
   }

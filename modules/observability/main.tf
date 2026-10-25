@@ -196,12 +196,12 @@ locals {
       merge(local.w, { x = 0, y = 0, properties = { title = "Running tasks", region = var.region, stat = "Minimum", period = 60, metrics = [
         for k, s in local.services : ["ECS/ContainerInsights", "RunningTaskCount", "ClusterName", var.cluster_name, "ServiceName", s, { label = k }]
       ] } }),
-      merge(local.w, { x = 12, y = 0, properties = { title = "CPU / memory (%)", region = var.region, stat = "Average", period = 60, metrics = flatten([
-        for k, s in local.services : [
-          ["AWS/ECS", "CPUUtilization", "ClusterName", var.cluster_name, "ServiceName", s, { label = "${k} cpu" }],
-          ["AWS/ECS", "MemoryUtilization", "ClusterName", var.cluster_name, "ServiceName", s, { label = "${k} mem" }],
-        ]
-      ]) } }),
+      # concat, never flatten(): flatten is recursive and would turn these arrays of arrays into one flat list,
+      # which CloudWatch rejects ("metrics has to be an array of array of strings"; seen live 2026-10-25).
+      merge(local.w, { x = 12, y = 0, properties = { title = "CPU / memory (%)", region = var.region, stat = "Average", period = 60, metrics = concat(
+        [for k, s in local.services : ["AWS/ECS", "CPUUtilization", "ClusterName", var.cluster_name, "ServiceName", s, { label = "${k} cpu" }]],
+        [for k, s in local.services : ["AWS/ECS", "MemoryUtilization", "ClusterName", var.cluster_name, "ServiceName", s, { label = "${k} mem" }]],
+      ) } }),
       merge(local.w, { x = 0, y = 6, properties = { title = "EFS I/O bytes", region = var.region, stat = "Sum", period = 300, metrics = [
         ["AWS/EFS", "DataWriteIOBytes", "FileSystemId", var.file_system_id, { label = "write" }],
         ["AWS/EFS", "DataReadIOBytes", "FileSystemId", var.file_system_id, { label = "read" }],
@@ -211,12 +211,10 @@ locals {
         ["AWS/EFS", "BurstCreditBalance", "FileSystemId", var.file_system_id, { label = "burst credits (bytes)" }],
         ["AWS/EFS", "ClientConnections", "FileSystemId", var.file_system_id, { label = "clients", yAxis = "right", stat = "Sum" }],
       ] } }),
-      merge(local.w, { x = 0, y = 12, properties = { title = "NAT bytes out / port errors", region = var.region, stat = "Sum", period = 300, metrics = flatten([
-        for az, n in var.nat_gateways_by_az : [
-          ["AWS/NATGateway", "BytesOutToDestination", "NatGatewayId", n, { label = "${az} bytes out" }],
-          ["AWS/NATGateway", "ErrorPortAllocation", "NatGatewayId", n, { label = "${az} port errors", yAxis = "right" }],
-        ]
-      ]) } }),
+      merge(local.w, { x = 0, y = 12, properties = { title = "NAT bytes out / port errors", region = var.region, stat = "Sum", period = 300, metrics = concat(
+        [for az, n in var.nat_gateways_by_az : ["AWS/NATGateway", "BytesOutToDestination", "NatGatewayId", n, { label = "${az} bytes out" }]],
+        [for az, n in var.nat_gateways_by_az : ["AWS/NATGateway", "ErrorPortAllocation", "NatGatewayId", n, { label = "${az} port errors", yAxis = "right" }]],
+      ) } }),
       merge(local.w, { x = 12, y = 12, properties = { title = "App log errors (count)", region = var.region, stat = "Sum", period = 300, metrics = [
         [local.ns, "WriterErrors", { label = "writer" }],
         [local.ns, "ReaderErrors", { label = "reader" }],
