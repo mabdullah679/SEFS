@@ -124,9 +124,9 @@ resource "aws_cloudwatch_metric_alarm" "efs_no_clients" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "nat_port_errors" {
-  for_each = toset(var.nat_gateway_ids)
+  for_each = var.nat_gateways_by_az # keys = AZ names (known at plan); NAT IDs are not
 
-  alarm_name          = "${var.name}-nat-${each.value}-port-allocation-errors"
+  alarm_name          = "${var.name}-nat-${each.key}-port-allocation-errors"
   alarm_description   = "NAT gateway ${each.value} failed to allocate a source port (connection errors for the apps)."
   namespace           = "AWS/NATGateway"
   metric_name         = "ErrorPortAllocation"
@@ -212,9 +212,9 @@ locals {
         ["AWS/EFS", "ClientConnections", "FileSystemId", var.file_system_id, { label = "clients", yAxis = "right", stat = "Sum" }],
       ] } }),
       merge(local.w, { x = 0, y = 12, properties = { title = "NAT bytes out / port errors", region = var.region, stat = "Sum", period = 300, metrics = flatten([
-        for n in var.nat_gateway_ids : [
-          ["AWS/NATGateway", "BytesOutToDestination", "NatGatewayId", n, { label = "${n} bytes out" }],
-          ["AWS/NATGateway", "ErrorPortAllocation", "NatGatewayId", n, { label = "${n} port errors", yAxis = "right" }],
+        for az, n in var.nat_gateways_by_az : [
+          ["AWS/NATGateway", "BytesOutToDestination", "NatGatewayId", n, { label = "${az} bytes out" }],
+          ["AWS/NATGateway", "ErrorPortAllocation", "NatGatewayId", n, { label = "${az} port errors", yAxis = "right" }],
         ]
       ]) } }),
       merge(local.w, { x = 12, y = 12, properties = { title = "App log errors (count)", region = var.region, stat = "Sum", period = 300, metrics = [

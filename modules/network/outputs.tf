@@ -30,3 +30,8 @@ output "nat_gateway_ids" {
   value       = [for k in local.nat_keys : aws_nat_gateway.this[k].id]
 }
 
+
+output "nat_gateways_by_az" {
+  description = "map(AZ name => NAT gateway ID); keys known at plan time (for_each-safe downstream)."
+  value       = { for k, n in aws_nat_gateway.this : k => n.id }
+}

@@ -4,6 +4,11 @@
 # outputs can show. module.images is overridden: no docker.
 
 mock_provider "aws" {
+  mock_resource "aws_sns_topic" {
+    defaults = {
+      arn = "arn:aws:sns:us-east-1:111122223333:sefs-ut-alerts"
+    }
+  }
   # Provider ARN validators run on mocked values, so ARN attrs need real shapes.
   mock_resource "aws_iam_role" {
     defaults = {

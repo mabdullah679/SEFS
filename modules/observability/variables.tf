@@ -28,9 +28,9 @@ variable "file_system_id" {
   type        = string
 }
 
-variable "nat_gateway_ids" {
-  description = "NAT gateway IDs (one alarm each on ErrorPortAllocation)."
-  type        = list(string)
+variable "nat_gateways_by_az" {
+  description = "map(AZ => NAT gateway ID). Keyed by AZ because NAT IDs are unknown at plan time and for_each needs known keys."
+  type        = map(string)
 }
 
 variable "writer_log_group" {

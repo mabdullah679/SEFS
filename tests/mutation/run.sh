@@ -102,6 +102,10 @@ m41 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: policy/PowerUserAccess ::: 
 m42 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: Resource = "arn:${local.partition}:iam::${local.account}:role/${var.name}-*" ::: Resource = "*" ::: tests/unit/bootstrap.tftest.hcl::github_role_iam_is_scoped_and_cannot_touch_itself
 m43 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: force_destroy = var.allow_state_destroy ::: force_destroy = true ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only
 m44 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: hash_key     = "LockID" ::: hash_key     = "ID" ::: tests/unit/bootstrap.tftest.hcl::lock_table_shape
+m45 ::: OBS ::: modules/observability/main.tf ::: sub ::: treat_missing_data  = "breaching" # no metric at all means no task either ::: treat_missing_data  = "notBreaching" # no metric at all means no task either ::: tests/unit/observability.tftest.hcl::service_down_alarm_treats_missing_as_breaching
+m46 ::: OBS ::: modules/observability/main.tf ::: sub ::: pattern        = "\"WRITE_PROBE ALLOWED\"" ::: pattern        = "\"WRITE_PROBE DENIED\"" ::: tests/unit/observability.tftest.hcl::reader_write_allowed_is_a_security_alarm
+m47 ::: OBS ::: modules/observability/main.tf ::: sub@3 ::: alarm_actions       = [aws_sns_topic.alerts.arn] ::: alarm_actions       = [] ::: tests/unit/observability.tftest.hcl::every_alarm_notifies_the_alerts_topic
+m48 ::: OBS ::: modules/observability/main.tf ::: sub ::: for_each = var.nat_gateways_by_az # keys = AZ names (known at plan); NAT IDs are not ::: for_each = { for k, v in var.nat_gateways_by_az : k => v if k == sort(keys(var.nat_gateways_by_az))[0] } ::: tests/unit/observability.tftest.hcl::efs_and_backup_alarms_shape
 EOF
 
 # Apply one mutation in place to $1 (a temp copy). Prints nothing on success.

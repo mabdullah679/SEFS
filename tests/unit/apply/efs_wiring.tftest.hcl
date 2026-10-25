@@ -9,6 +9,11 @@
 # the same file system.
 
 mock_provider "aws" {
+  mock_resource "aws_sns_topic" {
+    defaults = {
+      arn = "arn:aws:sns:us-east-1:111122223333:sefs-ut-alerts"
+    }
+  }
   # The provider validates aws_efs_file_system_policy.policy as JSON even on
   # mocked values. This stand-in is NOT asserted on for content (that is
   # efs_policy.tftest.hcl's job); only "attached == rendered" is checked here.

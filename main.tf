@@ -118,7 +118,7 @@ module "observability" {
   writer_service_name          = module.apps.writer_service_name
   reader_service_name          = module.apps.reader_service_name
   file_system_id               = module.efs.file_system_id
-  nat_gateway_ids              = module.network.nat_gateway_ids
+  nat_gateways_by_az           = module.network.nat_gateways_by_az
   writer_log_group             = module.apps.writer_log_group
   reader_log_group             = module.apps.reader_log_group
   backup_vault_name            = module.backup.vault_name
