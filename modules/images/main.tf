@@ -67,10 +67,25 @@ resource "terraform_data" "build" {
     }
     command = <<-EOT
       set -eu
+      # Each build gets a throwaway Docker config holding the ECR credential directly.
+      # No `docker login`: the writer and reader builds run in parallel, and concurrent
+      # logins collide in the host credential store (macOS keychain error -25299,
+      # reproduced 3/3). A fresh config is not enough on its own: with no auths in it,
+      # the CLI auto-selects the keychain helper anyway (observed). Writing `auths`
+      # directly keeps the CLI on the file store, and the token dies with the temp dir.
+      DOCKER_HOST="$${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}"
+      export DOCKER_HOST
+      umask 077
+      DOCKER_CONFIG="$(mktemp -d)"
+      export DOCKER_CONFIG
+      trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+      if [ -d "$HOME/.docker/cli-plugins" ]; then
+        ln -s "$HOME/.docker/cli-plugins" "$DOCKER_CONFIG/cli-plugins" # keep buildx visible
+      fi
       REGISTRY="$${REPO_URL%%/*}"
       REGION="$(printf '%s' "$REGISTRY" | cut -d. -f4)"
-      aws ecr get-login-password --region "$REGION" \
-        | docker login --username AWS --password-stdin "$REGISTRY"
+      AUTH="$(aws ecr get-login-password --region "$REGION" | sed 's/^/AWS:/' | tr -d '\n' | base64 | tr -d '\n')"
+      printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$REGISTRY" "$AUTH" > "$DOCKER_CONFIG/config.json"
       # Tags are IMMUTABLE: if this exact content is already pushed, there is nothing to do.
       if aws ecr describe-images --region "$REGION" --repository-name "$REPO" \
            --image-ids imageTag="$TAG" >/dev/null 2>&1; then
