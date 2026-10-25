@@ -45,6 +45,11 @@ Already have a GitHub OIDC provider in the account? AWS allows one per issuer: r
 
 `CONFIRM_DESTROY_DATA=yes make down` removes the deployment but **keeps** the state bucket, lock table and CI role. Add `DESTROY_STATE=yes` to remove those too (the bucket is versioned, so this needs the explicit flag).
 
+## Two things learned the hard way
+
+- **`aws login` sessions and the S3 backend.** Terraform 1.9's built-in backend cannot read the `login_session` profile type; the provider can. `make tf-profile SOURCE=<login profile>` creates `sefs-tf`, a `credential_process` helper that exports the same session, and `make preflight` refuses to run on a `login_session` profile. CI is unaffected (OIDC puts credentials in the environment).
+- **Offline suites after `make init`.** Once the S3 backend is initialised in `.terraform/`, `terraform init -backend=false` *reuses* it and demands credentials. The unit and mutation runners therefore set their own `TF_DATA_DIR`, so `make test` works with no AWS access at all.
+
 ## Honest limits
 
 - **Deploy role breadth.** `sefs-github-deploy` holds `PowerUserAccess` plus IAM limited to `role/sefs-*`, and an explicit Deny on itself. That is broad: the stack creates VPC, EFS, ECS, ECR, Backup, Logs and SSM resources, and AWS offers no practical resource-level scoping for most create calls. The control that actually bounds it is the trust policy (one repo, one branch) and the fact that CI never manages the bootstrap stack.

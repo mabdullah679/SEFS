@@ -129,8 +129,8 @@ make test-contract   # Docker: writer + reader on one volume, as their real UIDs
 
 | Suite | Result on `main` (2026-10-25) |
 |---|---|
-| Unit | 23/23 plan-mode + 4/4 apply-mode (mocked) + static `prevent_destroy` check — all pass |
-| Mutation | 28/28 deliberate breaks caught (every R-ID with a code guard, plus "EFS auto-backups off"); a no-op control break correctly survives |
+| Unit | 37/37 (incl. access, registry, bootstrap) + 4/4 apply-mode (mocked) + static `prevent_destroy` check — all pass, offline |
+| Mutation | 43/43 deliberate breaks caught (28 requirements + 8 Bruno role/registry + 7 bootstrap); a no-op control break correctly survives |
 | Contract (Docker) | 16/16 assertions pass; with the reader mounted rw the suite fails, as it should |
 | Live verifier / e2e | Run 2026-10-25 against real AWS (ap-southeast-2): `make verify` 15/15 PASS + zero drift (before and after the rebuild); `make e2e` E1–E4 all PASS. See below |
 
