@@ -29,5 +29,5 @@ FIVE THINGS LEARNED THE HARD WAY
 HONEST LIMITS
 - The deploy role is broad. It can create almost anything except change IAM outside this project's own roles, and it can never change itself. AWS gives no practical way to narrow a role that must create networks, storage, containers and backups. What really bounds it is that only one repo and one branch can use it, and GitHub never manages the setup pieces.
 - Applying one piece at a time is something Terraform warns about. The "no leftover changes" check after each run is what makes it safe here. If that check fails, the run fails and the next push should deploy everything.
-- Nothing has run on GitHub yet. Everything is tested locally with fake AWS. The first real "check" push is the proof and needs your repo.
+- Proven on GitHub on 2026-10-25: a "check" push borrowed the deploy role, used the shared state, re-attached the two app services, deployed everything, confirmed zero drift and passed all 16 live checks, in under two minutes for the deploy job. It took seven attempts to get there; each problem found is listed above.
 - GitHub's machines are not ARM, so app images build under emulation and from scratch each time, which is slower.

@@ -73,10 +73,10 @@ Account guard: `allowed_account_id` in `account.auto.tfvars` is enforced by the 
 | Docker contract (writer/reader as real UIDs) | `tests/contract/` | 16/16 |
 | setup.sh secret safety (fake `aws`) | `tests/setup/selftest.sh` | 5/5; mutation-proven |
 | CI change mapper | `tests/ci/selftest.sh` | 9/9; mutation-proven |
-| Live verify | `tests/live/verify.sh` | 15/15 + zero drift (2026-10-25, ap-southeast-2); OBS line added after that run |
+| Live verify | `tests/live/verify.sh` | 16/16 + zero drift (2026-10-25, ap-southeast-2, run from GitHub Actions) |
 | Live e2e | `tests/live/e2e.sh` | E1–E4 pass (2026-10-25) |
 | Bruno collection live | `bruno/sefs` | **not yet run live** (see PLAN.md §7) |
-| GitHub Actions "check" | `.github/workflows/check.yml` | OIDC assume proven 2026-10-25; first full CI deploy in progress at time of writing |
+| GitHub Actions "check" | `.github/workflows/check.yml` | **Live-proven 2026-10-25** (run 40216156247): full apply from GitHub, zero drift, verify 16/16 incl. OBS; deploy job 1 m 47 s |
 
 Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md). Not established: the errno EFS returns for a denied write is undocumented (observed `EROFS`); no backup job has been observed completing; no writer-role control run for E3.
 

@@ -144,6 +144,7 @@ make test-contract   # Docker: writer + reader on one volume, as their real UIDs
 | E3 reader write with `readOnly=false` | Denied. The kernel showed the mount `rw` and POSIX allowed the write (`drwxrwxr-x`, group 1000, reader gid 1000), so only the EFS file-system policy could refuse it |
 | E4 destroy + re-apply the apps | All 46 pre-existing files read back intact; file system unchanged |
 | `make down` | 54 destroyed + EFS deleted + inactive task definitions deleted; per-service sweep clean; account re-checked independently |
+| GitHub Actions `check` push (2026-10-25, run 40216156247) | OIDC → shared state → full apply → zero drift → verify **16/16** incl. observability; deploy job 1 m 47 s |
 
 Found only by the live run, since fixed: parallel `docker login` collided in the macOS keychain (-25299), leaving the first `make up` at 52/55; teardown missed INACTIVE task definitions; `verify.sh` misread `tostring(null)` as a configured CMK.
 
