@@ -1,6 +1,8 @@
 # SEFS reader. Multi-stage: Maven + JDK only in the build stage, so the host needs
 # Docker and nothing else.
-FROM maven:3-eclipse-temurin-21 AS build
+# Build stage runs on the BUILDER's native platform: Java bytecode is portable, so Maven
+# never runs under QEMU when an x86 runner builds the arm64 image (CI was > 40 min).
+FROM --platform=$BUILDPLATFORM maven:3-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY pom.xml .
 RUN mvn -B -q dependency:go-offline
