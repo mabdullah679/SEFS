@@ -10,8 +10,11 @@ set -euo pipefail
 TF="${TF:-terraform}"
 # name/region: env first (CI exports TF_VAR_*), then account.auto.tfvars, then defaults.
 # `terraform console` is deliberately avoided here: slow, and it needs backend credentials.
-name="${TF_VAR_name:-$(sed -nE 's/^name *= *"([^"]+)".*/\1/p' account.auto.tfvars 2>/dev/null)}"; name="${name:-sefs}"
-region="${TF_VAR_region:-${AWS_REGION:-$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars 2>/dev/null)}}"; region="${region:-us-east-1}"
+# (`|| true`: a missing tfvars file makes sed exit 2, and under set -e an assignment inherits
+#  the substitution's status; that killed the script silently in CI.)
+tfv() { sed -nE "s/^$1 *= *\"([^\"]+)\".*/\\1/p" account.auto.tfvars 2>/dev/null || true; }
+name="${TF_VAR_name:-$(tfv name)}"; name="${name:-sefs}"
+region="${TF_VAR_region:-${AWS_REGION:-$(tfv region)}}"; region="${region:-us-east-1}"
 state="$($TF state list 2>/dev/null || true)"
 echo "adopt-orphans: cluster=$name region=$region state_entries=$(grep -c . <<<"$state" || true)"
 adopted=0
