@@ -67,7 +67,7 @@ run "state_bucket_is_private_versioned_encrypted_tls_only" {
     error_message = "All four public-access blocks must be on."
   }
   assert {
-    condition     = aws_s3_bucket_server_side_encryption_configuration.state.rule[0].apply_server_side_encryption_by_default[0].sse_algorithm == "AES256"
+    condition     = tolist(tolist(aws_s3_bucket_server_side_encryption_configuration.state.rule)[0].apply_server_side_encryption_by_default)[0].sse_algorithm == "AES256"
     error_message = "With no CMK the bucket must still be encrypted (SSE-S3)."
   }
   assert {
@@ -132,7 +132,7 @@ run "github_role_iam_is_scoped_and_cannot_touch_itself" {
   assert {
     condition = anytrue([
       for st in jsondecode(aws_iam_role_policy.github_project_iam[0].policy).Statement :
-      st.Effect == "Deny" && st.Action == "iam:*" && endswith(st.Resource, ":role/sefs-ut-github-deploy")
+      st.Effect == "Deny" && st.Action == "iam:*" && anytrue([for r in flatten([st.Resource]) : endswith(r, ":role/sefs-ut-github-deploy")])
     ])
     error_message = "The deploy role must explicitly deny all IAM on itself."
   }
