@@ -15,6 +15,8 @@ Owner's intent (2026-10-25): set the project up once; afterwards, pushing to `ma
    - `terraform plan -detailed-exitcode` must be clean afterwards (a targeted apply must leave no drift),
    - `tests/live/verify.sh`: every R-ID against live AWS.
 
+**Human in the loop.** The deploy job runs in the GitHub environment `production`. With a required reviewer on that environment (set on `mabdullah679/SEFS`; your clone: Settings → Environments → production → Required reviewers), every `check` push pauses at "Review deployments" until someone approves; the unit job still runs unattended. Remove the reviewer to make deploys fully automatic.
+
 Concurrency: one deploy at a time (`concurrency: sefs-deploy`), and the DynamoDB lock protects against a laptop apply colliding with CI.
 
 ## One-time setup (owner, ~10 min)

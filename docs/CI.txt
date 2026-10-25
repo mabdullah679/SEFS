@@ -6,7 +6,7 @@ Set the project up once. After that, push to the main branch with the word "chec
 WHAT HAPPENS ON A "CHECK" PUSH
 1. On every push, the fake-AWS tests run (no AWS account needed).
 2. If the message contains "check": GitHub borrows the deploy role (no AWS keys stored in GitHub), works out which pieces changed from the file paths (a module folder means that module; app code means the images and the apps; a root Terraform file means everything; docs and tests mean nothing to deploy; anything unknown means everything, to be safe), applies just those pieces using the shared state, confirms Terraform then sees no leftover changes, and runs the live checker.
-Only one deploy runs at a time, and a lock stops a laptop deploy and a GitHub deploy from colliding.
+A person can be kept in the loop: the deploy runs in a GitHub "environment" called production, and if that environment has a required reviewer (it does on the original repo; set it on yours under Settings, Environments), every "check" push pauses until someone approves it. Remove the reviewer to make deploys fully automatic. Only one deploy runs at a time, and a lock stops a laptop deploy and a GitHub deploy from colliding.
 
 ONE-TIME SETUP (about 10 minutes)
 1. Run ./setup.sh and, when asked, give your GitHub repo as owner/repo. That creates the shared state storage (a private, versioned, encrypted bucket and a lock table) and a deploy role that only that repo's main branch can use. Keep the small bootstrap/terraform.tfstate file; it is the only record of the state bucket.

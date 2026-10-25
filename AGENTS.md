@@ -100,6 +100,10 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 - A cancelled apply left ECS services in AWS but not in state → `scripts/adopt-orphans.sh` runs before every apply.
 - A fixed task-role name would be locked out of the EFS if the role were ever recreated → `name_prefix`.
 
+## 7b. Standing rules (owner, 2026-10-25)
+
+Deterministic (everything pinned: D27), OOP where the language has objects (D28), a human approves CI deploys unless the client removes the environment reviewer (D29), no account-specific values in code (`account.auto.tfvars` + five repo variables are the only inputs), no secrets anywhere but SSM.
+
 ## 8. If you are asked to change something
 
 1. Find the child in §3; read its `variables.tf`/`outputs.tf` (the contract) before its `main.tf`.

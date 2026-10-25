@@ -52,7 +52,7 @@ apply-one: init ## Update one child only: make apply-one CHILD=efs
 	@test -n "$(CHILD)" || { echo "usage: make apply-one CHILD=<name>"; exit 1; }
 	$(TF) apply -target=module.$(CHILD) $(APPROVE)
 
-plan: init
+plan: init ## Show pending changes against the shared state
 	$(TF) plan
 
 test: test-unit test-mutation test-contract test-setup ## All local (fake-AWS + Docker) proofs

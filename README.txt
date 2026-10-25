@@ -1,45 +1,48 @@
 SEFS - SHARED EFS FOR A PYTHON WRITER AND A SPRING BOOT READER (plain twin of README.md, 2026-10-25)
 
 WHAT IT IS
-One command builds, in a real AWS account: a private network across 2 data centers (AZs), one encrypted shared file system (EFS), a Python app that writes files to it and a Spring Boot app that reads the same files, daily backups kept 35 days, and a rule that moves files nobody has touched for 30 days to cheaper storage.
-It implements the spec "Shared EFS for Multi-App.docx". The 15 requirements are numbered R1 to R15 in PLAN.md.
+One command builds, in your own AWS account: a private network across two data centres, one encrypted shared file system, a Python app that writes files to it and a Spring Boot app that reads the same files but cannot write, daily backups kept 35 days, a rule that moves untouched files to cheaper storage after 30 days, alarms and a dashboard, a read-only checking role, and the plumbing that lets every later change deploy itself when you push to GitHub with the word "check".
+It implements the spec "Shared EFS for Multi-App.docx". The 15 requirements are numbered R1 to R15 in PLAN.md. If an AI agent is helping you, point it at AGENTS.md first.
 
 WHAT YOU NEED
-If you sign in to AWS with the newer aws login command, Terraform's state storage can't read that kind of login directly. setup.sh fixes this by creating a small helper profile called sefs-tf that passes the same login through; nothing is stored. If you skip setup.sh, run make tf-profile SOURCE=<your login profile> and then use AWS_PROFILE=sefs-tf.
-Terraform 1.9 or newer, Docker, the AWS CLI logged into the account, make and bash (on Windows, use WSL2). You don't need Java, Maven or Python; the apps are built inside Docker. Your internet upload needs to handle about 290 MB of app images within 20 minutes per attempt (three attempts), roughly 250 KB/s or better. On a healthy link the push takes under 7 minutes; on a 35 KB/s link it crawled for over two hours and failed, so the deploy now gives up instead of hanging. Nothing listens on your machine.
+An AWS account you can administer and a login for it. An empty GitHub repository you own, because the automation's deploy role trusts exactly one repository and its main branch. On your machine: Terraform 1.9 or newer, Docker, the AWS command line (version 2), jq, make and bash (Windows: use WSL2). You don't need Java, Maven or Python; the apps build inside Docker. Your upload link should manage about 250 KB/s or better for a first deploy from a laptop (about 290 MB of images); deploys from GitHub don't have that problem.
 
 HOW TO RUN
-Fresh clone, one command: ./setup.sh. It checks your tools, shows which AWS account you're logged into and asks you to confirm, writes the local account file, asks for any secrets the project lists (none today) and stores them only in AWS's parameter store as encrypted values, never on the command line or in Terraform's records, then deploys. make test-setup proves a secret can't leak, using a fake AWS.
-Step by step instead:
-make up: checks your tools and which AWS account you're in, then deploys everything in one Terraform apply. The app images are built and uploaded as part of that same apply.
-make verify: checks every requirement against what AWS actually reports, then confirms Terraform sees no difference between the code and what's running.
-make e2e (needs E2E_CONFIRM=yes): proves the writer writes, the reader reads, the reader can't write even with its read-only flag off, and the data survives the apps being destroyed.
-CONFIRM_DESTROY_DATA=yes make down: deletes everything including the data, then checks nothing is left.
-Before the first make up, create a file called account.auto.tfvars in the repo root (it is kept out of git) containing the 12-digit AWS account ID that Terraform is allowed to touch, and optionally the region. make up refuses to run without it, or if your AWS login belongs to a different account; Terraform repeats that check itself. The real test run on 2026-10-25 deployed to the Sydney region (ap-southeast-2) in account 445137568806, set through that file. If you set no region, the default is us-east-1. Only Sydney has actually been run.
-To update one piece only: make apply-one CHILD=network, security, efs, backup, images or apps. docs/COMPONENTS.md says which piece owns what.
+1. Create an empty repository on GitHub, clone this one, point it at yours, and push.
+2. Sign in to AWS in your shell.
+3. Run ./setup.sh. It checks your tools, shows which AWS account you're signed in to and asks you to confirm, asks for the region, an alarm e-mail (optional) and your GitHub repository, writes a local settings file that never leaves your machine, creates the shared state storage and the deploy role once, asks for any secrets the project lists (none today) and stores them only in AWS's parameter store, then deploys everything (about 8 minutes).
+4. In your GitHub repository's Actions variables, add the five values setup.sh prints at the end: the region, the account ID, the deploy role, the state bucket and the lock table. No secrets are needed.
+5. From then on, push to main with "check" in the commit message: only the pieces that changed are redeployed and every requirement is re-checked against live AWS. "check full" redeploys everything. A deploy waits for a human approval in GitHub if you keep the "production" environment's required reviewer switched on.
 
-WHY "make down" IS SPECIAL
-The file system is protected from deletion, and Terraform deliberately won't let a setting turn that off. So teardown removes the file system from Terraform's tracking, deletes everything else, deletes the file system directly, then looks for anything still tagged with this project.
+Other commands: make verify (check every requirement against live AWS), make e2e (prove the behaviour, including that the reader can't write even with its read-only flag off), make bruno (the Bruno collection), and CONFIRM_DESTROY_DATA=yes make down (delete everything, including the data; the state storage stays unless you add DESTROY_STATE=yes).
+
+IF SOMETHING REFUSES TO RUN
+- "credentials are account X, allowed is Y": you're signed in to the wrong account. The allowed account lives in the local settings file.
+- "is an aws login session": Terraform's state storage can't read that login type. make tf-profile creates a helper profile that passes the same login through; setup.sh does this for you.
+- "backend.hcl missing": run make bootstrap.
+- A failed or cancelled deploy: push again with "check full"; a small adopt step re-attaches anything AWS kept.
+- Region: any region with at least two data centres; only Sydney (ap-southeast-2) has been exercised live.
+
+WHAT IT DOES
+A private network in two or more data centres; both apps in private subnets with no public addresses; one file-system mount point per data centre, reachable only from the apps on port 2049; the writer writes files as user 1001 and the reader reads the same files as user 1002 and is refused when it tries to write; the file system is encrypted, uses standard performance, and moves old files to cheaper storage after 30 days; backups run daily and are kept 35 days; if the apps are destroyed the data survives and the apps re-attach on the next deploy; ten alarms (apps down, storage credits or connections, network port errors, backup failures, app errors, and a security alarm if the reader ever manages to write) go to an e-mail topic, and a dashboard shows the lot.
 
 THE ONE PLACE WE DIFFER FROM THE SPEC
-The spec suggests an EFS access point can make the reader read-only. It can't, because access points only set the user, group and folder. The container's read-only flag is easy to remove, and the shared folder is writable by the group on purpose. So the real protection is AWS permissions: the reader's role can only mount, and the file system's own policy explicitly blocks the reader from writing. The e2e test proves it by running the reader with the read-only flag switched off and checking that the write still fails.
+The spec suggests an EFS access point can make the reader read-only. It can't; access points only set the user, group and folder. The container's read-only flag is easy to remove and the shared folder is writable by the group on purpose. So the real protection is AWS permissions: the reader's role can only mount, and the file system's own policy blocks it from writing. make e2e proves it by running the reader with the read-only flag off and checking that the write still fails.
 
-BRUNO COLLECTION
-bruno/sefs checks every requirement against the live deployment by calling AWS directly. It stores no credentials: it signs with an AWS profile that borrows a read-only role through your own login for one hour. Its first step reads every deployed ID from AWS's parameter store, so nothing is typed by hand. Run: make bruno-profile SOURCE=<your login profile> once, then make bruno. Two things it can't do, which make verify and make e2e cover: confirm the encryption key is AWS's own, and the test that runs the reader with its read-only flag off.
-
-TEST RESULTS SO FAR (on the main branch, 2026-10-25)
-- Fake-AWS tests: 45 of 45 plus 4 of 4 pass, plus a check that the delete protection is in place. They block all network access, so a passing run made no AWS calls.
-- Deliberate-break tests: we broke 48 rules one at a time (for example turning encryption off, opening the firewall, letting the reader write) and all 48 were caught. A harmless change was correctly not flagged, which shows the harness can't fake a catch.
-- Docker test: 16 of 16 checks pass. The writer and reader share one folder as their real users, every file the reader read matches what the writer wrote, and the reader's write was blocked. With the reader switched to read-write, the test fails as it should.
-- Real AWS (run 2026-10-25, Sydney region): one command deployed all 55 resources in about 8 minutes. The live checker passed 15 of 15 with Terraform seeing zero difference between the code and what was running, both right after the deploy and again after the apps were rebuilt. The writer wrote 40 files and the reader read all 40 back with matching fingerprints. The reader's write was refused even with its read-only flag switched off: the mount was read-write and the folder's permissions allowed the write, so only the file system's own policy could have blocked it. After destroying and rebuilding the apps, all 46 existing files were still there. Teardown then removed everything and I checked each AWS service directly to confirm nothing was left.
-- Problems only real AWS showed, now fixed: the two image builds collided in the Mac keychain; teardown missed old task definitions; the checker misread an empty setting as a custom key.
-- Not proven: AWS doesn't document which error a blocked write returns (we saw "read-only file system"). There was no matching control run using the writer's role. No backup job completed during the test, so the 35-day backup is proven as configuration only.
+TESTS AND WHAT HAS BEEN PROVEN
+Local tests need no AWS account: fake-AWS tests 45 of 45 plus 4 of 4; 48 deliberate breaks all caught; the Docker writer/reader test 16 of 16; the setup self-test 5 of 5; the CI change mapper 9 of 9; the live checker's own self-test 29 scenarios.
+Real AWS, Sydney, 2026-10-25: one command deployed 55 resources in about 8 minutes; the live checker passed 15 of 15 with zero drift; the writer wrote 40 files and the reader read all 40 back identical; the reader was refused even with its read-only flag off; 46 files survived destroying and rebuilding the apps; teardown left the account clean, checked independently.
+GitHub Actions, 2026-10-25: a "check" push borrowed the deploy role, used the shared state, deployed everything, confirmed zero drift and passed all 16 live checks, with the deploy job taking under two minutes.
+Not proven: which exact error a blocked write returns (we saw "read-only file system"); a backup job finishing (the 35-day backup is proven as configuration only); a control run of the same read-only test using the writer's role.
 
 WHERE THINGS ARE
-main.tf is the mother that wires everything. modules/ holds the six pieces (network, security, efs, backup, images, apps). apps/ holds the two programs. tests/ holds the four test kinds. scripts/teardown.sh is the full delete. docs/ holds the decisions log, the component map, the contracts and the requirement-to-test map.
+main.tf is the mother that wires everything; modules/ holds the children (network, security, efs, backup, images, apps, observability, access, registry, bootstrap); apps/ holds the two programs; setup.sh, Makefile and scripts/ hold the automation; .github/workflows/check.yml is the CI; bruno/sefs is the Bruno collection; tests/ holds every suite; docs/ holds the CI guide, the component map, the module contracts, the decisions log and the requirement-to-test map; PLAN.md holds the requirements, the plan and what ships next (the 2.5D GUI). Every .md has a plain-text twin like this one.
 
 DESIGN CHOICES THAT AREN'T OBVIOUS
-- One Terraform state for everything, not one per layer. Separate states would make "one command deploys all" into several commands. The file system is protected by its delete lock instead, and any piece can still be updated alone.
-- The images are built during the apply. Pushing them first would need the image registry to exist first, which means two applies.
-- The apps wait until the file system's policy exists. Without a policy, EFS lets anyone who can reach it write, and a reader that connected early would keep write access.
-- The app roles get generated names. The file system policy is tied to each role's internal AWS ID. A role recreated under the same name would be silently locked out, because Terraform would see nothing to change.
+- One Terraform state for everything, not one per layer: "one command deploys all" would otherwise become several commands. The file system is protected by its delete lock instead, and any piece can still be updated alone, with a clean-plan check afterwards.
+- The app images are built during the deploy, and the Java build runs on the builder's own chip type because Java bytecode is portable; building first would need two deploys, and emulating a Java build on GitHub's machines took over 40 minutes.
+- The apps wait until the file system's policy exists; without a policy, anyone who can reach the file system can write.
+- The app roles get generated names, because a role recreated under the same name would be silently locked out of the file system.
+- You create the deploy role, not the automation, and the role can never change itself, so a workflow can't widen its own permissions or delete the state it runs on.
+- Secrets never pass through Terraform: setup.sh streams them straight into AWS's parameter store, proven by a test with a fake AWS.
+- Everything is pinned: Terraform and provider versions, GitHub actions by commit, base images by exact version, and image tags are content hashes, so the same code always builds the same thing.

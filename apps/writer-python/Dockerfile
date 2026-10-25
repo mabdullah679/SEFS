@@ -1,5 +1,5 @@
 # SEFS writer. Host needs only Docker; Python lives in the image.
-FROM python:3.12-slim
+FROM python:3.12.8-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
