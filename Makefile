@@ -5,7 +5,7 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
+.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile cost preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -72,6 +72,9 @@ bruno-profile: ## Install the credential-free 'sefs-bruno' AWS profile: make bru
 
 bruno: ## Run the self-hydrating Bruno collection against the live deployment (read-only role)
 	bru run bruno/sefs --env aws --env-var awsRegion="$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
+
+cost: ## Running cost from the AWS Pricing API: per hour, per minute, 30 days (read-only; needs pricing:GetProducts)
+	python3 scripts/cost.py --region "$$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars)"
 
 verify: ## Real AWS: every R-ID checked against live state + plan shows no drift
 	bash tests/live/verify.sh
