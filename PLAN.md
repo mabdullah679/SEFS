@@ -113,3 +113,17 @@ Collaboration without overwriting = **hard file ownership + contracts first + on
 | Q4 | Mutation-prove everything above as it lands | pending |
 
 Usage rule (owner, 2026-10-25): owner gates on `/usage`; small stoppable chunks; no agent fan-out without an explicit go.
+
+## 8. Queue — client experience + observability + 2.5D GUI (owner, 2026-10-25; not yet built)
+
+> The client's agent reads ONE markdown file and grasps the whole stack. Telemetry/observability is Terraform-managed. A GUI microservice shows the live `Project=sefs` infrastructure as a 3D / 2.5D top-down model: hover/click for live health; click a resource to "open the doors" into a 2.5D room of its internals (preferred over linking to the AWS console). Budgets (per minute / per hour) updated for the new services, plus a 30-day figure from real cost/usage, shown in the GUI. Acceptance: fresh clone → 2.5D internals, everything in between proven.
+
+| # | Item | Design call / open question | State |
+|---|---|---|---|
+| Q5 | **One file for agents**: `AGENTS.md` at the root (the convention coding agents read); `CLAUDE.md` is a one-line pointer to it. Contents: what/why, topology, every `make` target, mother/child protocol, contracts, proofs and how to re-run them, decisions, live-run history, where truth lives (SSM, state bucket), and the honest-limits list | lead's call | not started |
+| Q6 | **Telemetry/observability in Terraform** (`modules/observability`): ECS Container Insights, CloudWatch dashboard, alarms (writer/reader running count, EFS burst credits + client errors, NAT error port allocation, backup job failures), log metric filters on `WRITE_ERROR` / `READ_ERROR`; cost allocation tag `Project` activated (24 h lag before Cost Explorer can group by it) | lead's call; alarms need a destination: SNS topic + owner email (prompted by setup.sh) | not started |
+| Q7 | **GUI microservice, 2.5D/3D**: serverless so idle cost ≈ 0 (owner: "without eating compute"): S3 + CloudFront for the static three.js app; Lambda (Python) behind API Gateway as a read-only data API using a Bruno-like least-privilege role (Resource Groups Tagging API for inventory, EFS/ECS/EC2 describes + CloudWatch metrics for health, Cost Explorer for spend). Per-resource "rooms" (EFS: mount targets/APs/policy; ECS: services/tasks/containers; VPC: subnets/NATs/routes; Backup: vault/plan/recovery points) | **open: who may see it?** (a) Cognito login, (b) IAM-signed only (CLI/agents), (c) unauthenticated obscure URL (not recommended) | not started |
+| Q8 | **Cost**: per-minute/per-hour budget recomputed from the Pricing API for the final stack; 30-day figure = Cost Explorer actuals by `Project=sefs` (real usage) projected + published rates for anything not yet observed; shown in the GUI and recorded in README | lead's call | not started |
+| Q9 | **End-to-end proof**: fresh clone → `./setup.sh` → `make up` → `make verify` → `make bruno` → open GUI → open a room; then "check" push; then teardown clean | after Q5–Q8 | not started |
+
+Chunking (owner gates on usage): chunk 4 = Q5 + Q6 + Q8-rates; chunk 5 = Q7 overview (model + live health + cost panel); chunk 6 = Q7 rooms + Q9.

@@ -37,3 +37,10 @@ I set up first: git repo, a contract that fixes every piece's inputs and outputs
 5 Apps: the Python writer, the Spring Boot reader, building the images, and the Docker test.
 6 Verification: fake-AWS tests, the mutation pass, the real-AWS checker, and the requirement-to-test map.
 Then I merge in order, run every proof, and write the README (markdown and plain text), the decisions log, and the component-to-child map.
+
+NEXT QUEUE (2026-10-25, not yet built)
+- One file for agents: AGENTS.md at the repo root with the whole picture; CLAUDE.md just points to it.
+- Monitoring built by Terraform: container metrics, a dashboard, alarms (apps down, storage credits low, NAT errors, backup failures), alerts to your email.
+- A 2.5D/3D map of the live sefs infrastructure, built serverless so it costs almost nothing when idle: hover for live health, click a resource to open its "room" and see its internals. Open question: who is allowed to see it (login, signed requests only, or an unlisted address).
+- Costs: per-minute and per-hour recomputed for the final stack, plus a 30-day figure from real usage, shown in the map.
+- Final proof: fresh clone to opening a room, then a "check" push, then a clean teardown.
