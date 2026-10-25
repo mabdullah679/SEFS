@@ -201,3 +201,33 @@ run "iam_and_platform" {
     error_message = "outputs must be wired"
   }
 }
+
+# Task roles must be name_prefix'd so a replacement gets a new ARN and the EFS
+# FS policy (which AWS pins to the role's unique ID) is forced to update.
+# If `name` were fixed instead, name_prefix would be provider-computed (a mock
+# random string here) and these asserts go red.
+run "task_roles_use_name_prefix" {
+  command = apply
+
+  assert {
+    condition     = aws_iam_role.writer.name_prefix == "sefs-test-writer-task-"
+    error_message = "writer task role must use name_prefix, not a fixed name"
+  }
+  assert {
+    condition     = aws_iam_role.reader.name_prefix == "sefs-test-reader-task-"
+    error_message = "reader task role must use name_prefix, not a fixed name"
+  }
+  assert {
+    condition     = length(aws_iam_role.writer.name_prefix) <= 38 && length(aws_iam_role.reader.name_prefix) <= 38
+    error_message = "IAM role name_prefix max is 38 characters"
+  }
+}
+
+# var.name longer than 25 would push the prefix past 38 chars: rejected.
+run "name_too_long_rejected" {
+  command = plan
+  variables {
+    name = "abcdefghijklmnopqrstuvwxyz"
+  }
+  expect_failures = [var.name]
+}

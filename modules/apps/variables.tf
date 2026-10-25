@@ -3,6 +3,13 @@
 variable "name" {
   description = "Name prefix."
   type        = string
+
+  validation {
+    # Task-role name_prefix is "<name>-writer-task-" / "<name>-reader-task-"
+    # (13 extra chars); IAM role name_prefix max is 38.
+    condition     = length(var.name) >= 1 && length(var.name) <= 25
+    error_message = "name must be 1-25 characters so the task-role name_prefix fits IAM's 38-character limit."
+  }
 }
 
 variable "region" {
