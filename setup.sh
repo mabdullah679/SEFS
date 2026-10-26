@@ -87,6 +87,23 @@ gh_repo="$(ask "GitHub repo for CI deploys as owner/repo (blank = no CI role):")
 if [ -n "$gh_repo" ]; then make bootstrap AUTO=1 GITHUB_REPO="$gh_repo"; else make bootstrap AUTO=1; fi
 ok "state backend ready: $(sed -nE 's/^bucket *= *"([^"]+)".*/\1/p' backend.hcl)"
 
+if [ -n "$gh_repo" ] && [ -f backend.hcl ]; then
+  echo "== 3c/6 GitHub Actions variables (the only CI wiring; no secrets, OIDC replaces keys)"
+  ci_bucket="$(sed -nE 's/^bucket *= *"([^"]+)".*/\1/p' backend.hcl)"
+  ci_table="$(sed -nE 's/^dynamodb_table *= *"([^"]+)".*/\1/p' backend.hcl)"
+  ci_role="$(terraform -chdir=bootstrap output -raw github_deploy_role_arn 2>/dev/null || true)"
+  printf '      %s=%s\n' AWS_REGION "$region" AWS_ACCOUNT_ID "$acct" AWS_DEPLOY_ROLE_ARN "${ci_role:-<bootstrap output github_deploy_role_arn>}" TF_STATE_BUCKET "$ci_bucket" TF_LOCK_TABLE "$ci_table"
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 && [ -n "$ci_role" ]; then
+    if [ "$(ask "Set these 5 variables on $gh_repo now with the GitHub CLI? [y/N]")" = "y" ]; then
+      gh variable set AWS_REGION --body "$region" -R "$gh_repo" && gh variable set AWS_ACCOUNT_ID --body "$acct" -R "$gh_repo" \
+        && gh variable set AWS_DEPLOY_ROLE_ARN --body "$ci_role" -R "$gh_repo" && gh variable set TF_STATE_BUCKET --body "$ci_bucket" -R "$gh_repo" \
+        && gh variable set TF_LOCK_TABLE --body "$ci_table" -R "$gh_repo" && ok "5 variables set on $gh_repo; a push to main with 'check' now deploys"
+    else warn "not set; add them under Settings > Secrets and variables > Actions > Variables (docs/CI.md)"; fi
+  else
+    warn "GitHub CLI not signed in (or no role ARN yet): add the 5 values above under Settings > Secrets and variables > Actions > Variables (docs/CI.md)"
+  fi
+fi
+
 echo "== 4/6 secrets -> SSM SecureString (/$NAME/secrets/<name>)"
 count=0
 if [ -f "$MANIFEST" ]; then
