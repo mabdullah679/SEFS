@@ -1,4 +1,4 @@
-# "check": push to main with the word `check` in the commit message and the changed
+# "check": push to main with the whole word `check` in the commit message (not "checks"/"checked") and the changed
 # children get re-applied, then the live verifier runs. Root wiring changes apply the
 # whole mother. Nothing else on push: unit tests run on every push regardless.
 #
@@ -24,7 +24,14 @@ jobs:
   unit:
     name: unit + mutation-free local proofs
     runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
     steps:
+      - name: deploy gate (whole word "check" in the commit message; "checks"/"checked" do not count)
+        id: gate
+        env: { MSG: "${{ github.event.head_commit.message }}" }
+        run: |
+          if printf '%s' "$MSG" | grep -qiw 'check'; then echo "deploy=true"; else echo "deploy=false"; fi | tee -a "$GITHUB_OUTPUT"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with: { terraform_version: "1.9.8", terraform_wrapper: false }
@@ -36,7 +43,7 @@ jobs:
     name: apply changed children + verify
     needs: unit
     environment: production   # HITL: a required reviewer on this environment holds every deploy for approval
-    if: contains(github.event.head_commit.message, 'check')
+    if: needs.unit.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
