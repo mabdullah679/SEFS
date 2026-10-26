@@ -49,7 +49,7 @@ for t in aws jq "$TF"; do command -v "$t" >/dev/null || { say "missing tool: $t"
 OUT="$("$TF" output -json)"
 o() { jq -r --arg k "$1" '.[$k].value // empty | if type=="array" then join(",") else . end' <<<"$OUT"; }
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(echo var.region | "$TF" console | tr -d '"')}}"
-NAME="$(echo var.name | "$TF" console | tr -d '"')"
+NAME="$(o name)"   # from outputs: under remote state `terraform console` prints "Acquiring state lock..." into stdout
 CLUSTER="$(o cluster_name)"; SVC_W="$(o writer_service_name)"; SVC_R="$(o reader_service_name)"
 LG_W="$(o writer_log_group)"; LG_R="$(o reader_log_group)"
 SUBNETS="$(o private_subnet_ids)"; SG_APPS="$(o apps_security_group_id)"; FS_ID="$(o file_system_id)"
@@ -253,7 +253,8 @@ e4() {
   fi
 }
 
-e1; e2; e3; e4
+# E2E_ONLY="e3" (space-separated) re-runs a subset; default is all four in order.
+for step in ${E2E_ONLY:-e1 e2 e3 e4}; do case "$step" in e1|e2|e3|e4) "$step" ;; *) echo "unknown step $step" >&2; exit 2 ;; esac; done
 
 echo
 echo "== e2e summary =="
