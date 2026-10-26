@@ -52,12 +52,12 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 | Goal | Command | Notes |
 |---|---|---|
-| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying |
+| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying; step 3c sets the five GitHub Actions variables through `gh` when signed in |
 | Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed |
 | Deploy / redeploy | `make up` or `./sefs up` (`AUTO=1` skips the prompt) | preflight refuses the wrong account, a missing `backend.hcl`, or an `aws login` session profile (see §7) |
 | One child | `make apply-one CHILD=efs` | |
 | Live checks | `make verify` | every R-ID against AWS + `terraform plan` must be clean |
-| Live behaviour | `E2E_CONFIRM=yes make e2e` | write/read, IAM read-only proof, destroy-apps-and-recover |
+| Live behaviour | `E2E_CONFIRM=yes make e2e` (`E2E_ONLY="e3"` for a subset) | write/read, IAM read-only proof, destroy-apps-and-recover |
 | Bruno collection | `make bruno-profile SOURCE=<login profile>` once, then `make bruno` | signs with a credential-free profile that assumes `sefs-bruno-reader`; hydrates IDs from SSM |
 | All local proofs (no AWS) | `make test` | unit (mocked), mutation, Docker contract, setup self-test |
 | Tear down | `CONFIRM_DESTROY_DATA=yes make down` | deletes the EFS and its data; keeps state bucket unless `DESTROY_STATE=yes`; sweeps the account per service |

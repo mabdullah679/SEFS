@@ -26,6 +26,8 @@ HOURS_30D = 24 * 30
 class Pricing:
     """Thin wrapper over `aws pricing get-products`; one call per service, filtered locally."""
 
+    FAMILY = {"AmazonEC2": "NAT Gateway"}
+
     def __init__(self, location: str) -> None:
         self.location = location
         self._cache: dict[str, list[tuple[str, str, float, str]]] = {}
@@ -33,8 +35,13 @@ class Pricing:
     def rows(self, service: str) -> list[tuple[str, str, float, str]]:
         if service in self._cache:
             return self._cache[service]
+        # AmazonEC2 alone is tens of thousands of SKUs per region (a 47-minute download was measured on a
+        # slow uplink, 2026-10-26); the only EC2 line we price is the NAT gateway, so narrow that service.
+        filters = [f"Type=TERM_MATCH,Field=location,Value={self.location}"]
+        if service in self.FAMILY:
+            filters.append(f"Type=TERM_MATCH,Field=productFamily,Value={self.FAMILY[service]}")
         cmd = ["aws", "pricing", "get-products", "--region", "us-east-1", "--service-code", service,
-               "--filters", f"Type=TERM_MATCH,Field=location,Value={self.location}", "--output", "json"]
+               "--filters", *filters, "--output", "json"]
         out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
         rows = []
         for item in json.loads(out)["PriceList"]:

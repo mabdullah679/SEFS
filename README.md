@@ -49,8 +49,8 @@ The host does **not** need Java, Maven or Python: both apps build inside Docker.
    ./sefs setup        # same as ./setup.sh
    ```
    It checks the tools, shows the account your credentials resolve to and asks you to confirm it, asks for the region, an alarm e-mail (optional) and your GitHub repo (`you/sefs`), writes the git-ignored `account.auto.tfvars`, creates the state bucket, lock table and CI role (once), prompts for any secret in [secrets.manifest](secrets.manifest) (none today) and stores it only in SSM, then runs `make up` (≈ 8 min). `./setup.sh --no-deploy` stops before the deploy.
-4. Wire CI once: in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `AWS_REGION`, `AWS_ACCOUNT_ID`, `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` from `setup.sh`'s final output (no secrets: OIDC replaces keys). Details: [docs/CI.md](docs/CI.md#one-time-setup-owner-10-min).
-5. From now on, push to `main` with **`check`** in the commit message: the changed children redeploy and the live checks run. `check full` redeploys everything.
+4. Wire CI once. `./sefs setup` prints the five values and, if the GitHub CLI is signed in, sets them for you when you answer `y`. Otherwise in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `AWS_REGION`, `AWS_ACCOUNT_ID`, `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` from `setup.sh`'s final output (no secrets: OIDC replaces keys). Details: [docs/CI.md](docs/CI.md#one-time-setup-owner-10-min).
+5. From now on, push to `main` with the whole word **`check`** in the commit message (`checks`/`checked` do not count): the changed children redeploy and the live checks run. `check full` redeploys everything.
 
 Identical on macOS, Linux and WSL2 (`./sefs <verb>` and `make <verb>` are the same thing):
 
@@ -113,7 +113,7 @@ Inputs: [variables.tf](variables.tf) (all with defaults; your values go in `acco
 
 ## Running cost
 
-`make cost` fetches today's rates from the AWS Pricing API for your region ([scripts/cost.py](scripts/cost.py)); quantities mirror the Terraform code. Measured for `ap-southeast-2` on 2026-10-26 (published rates, not an invoice):
+`make cost` fetches today's rates from the AWS Pricing API for your region ([scripts/cost.py](scripts/cost.py)); quantities mirror the Terraform code. It runs in about half a minute (the EC2 query is narrowed to the NAT Gateway family; unfiltered it downloaded for 47 minutes on a slow uplink). Measured for `ap-southeast-2` on 2026-10-26 (published rates, not an invoice):
 
 | Item | $/hour |
 |---|---|
@@ -147,8 +147,10 @@ make test-setup      # setup.sh with a fake aws: a secret never touches argv or 
 | Live (`ap-southeast-2`, 2026-10-25) | `make up` 55 resources ≈ 8 min; `make verify` 15/15 + zero drift; e2e E1–E4 pass (40 files round-tripped; reader denied with `readOnly=false`; 46 files survived destroy/re-apply); `make down` clean, account re-checked independently |
 | GitHub Actions `check` (run 40216156247) | OIDC → shared state → full apply → zero drift → verify **16/16** incl. observability; deploy job 1 m 47 s |
 | Bruno (live, 2026-10-26, against the CI-deployed stack) | 20 requests, **58/58** tests under the `sefs-bruno-reader` role; negative control with bogus security-group IDs fails R9 and the group-exists check, as it should |
+| `./sefs` wrapper, whole workflow (live, 2026-10-26, CI-deployed stack) | `preflight` → `plan` (clean) → `verify` 16/16 → `e2e` E1–E4 PASS (89 files round-tripped; `EROFS` on both probes; 92 files survived destroy/re-apply) → `bruno` 58/58 → `cost` → `up` (no-op: 0 changed) → `plan` (clean) → `down`; every read verb (`show`, `status`, `alarms`, `logs`, `url`) answered from the live registry |
+| GitHub Actions `check` (run 40261693403) | first run after the deploy job moved behind the `production` approval: OIDC with the environment subject → empty state → full apply → zero drift → verify 16/16 |
 
-**Not established:** the errno EFS returns for a denied write is undocumented (observed `EROFS`); no backup job has been observed completing (R14 is proven as configuration); no writer-role control run for the IAM mutation. Mapping: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
+**Not established:** a fresh-machine `./sefs setup` run end to end by someone other than the author (every step is self-tested and the pieces are live-proven, but the single-command path on a clean laptop is yours to confirm); the errno EFS returns for a denied write is undocumented (observed `EROFS`); no backup job has been observed completing (R14 is proven as configuration); no writer-role control run for the IAM mutation. Mapping: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 
 ## Layout
 

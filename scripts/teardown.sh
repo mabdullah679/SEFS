@@ -35,8 +35,17 @@ for _ in $(seq 1 30); do
   sleep 10
 done
 
-# Terraform only deregisters task definitions (they stay INACTIVE forever); delete them.
+# Terraform only deregisters the revision it holds in state (and leaves it INACTIVE forever). A targeted
+# destroy + re-apply (tests/live/e2e.sh E4) can leave earlier revisions ACTIVE outside state: observed
+# 2026-10-26 (writer:4, reader:5 after a clean destroy). The cluster is gone, so every revision in our
+# families is ours to deregister, then delete.
 for fam in "$name-writer" "$name-reader" "$name-reader-iam-mutation"; do
+  active=$(aws ecs list-task-definitions --region "$region" --family-prefix "$fam" --status ACTIVE \
+    --query 'taskDefinitionArns' --output text)
+  if [[ -n "$active" && "$active" != "None" ]]; then
+    for a in $active; do aws ecs deregister-task-definition --region "$region" --task-definition "$a" >/dev/null; done
+    echo "Deregistered stray active task definitions: $active"
+  fi
   arns=$(aws ecs list-task-definitions --region "$region" --family-prefix "$fam" --status INACTIVE \
     --query 'taskDefinitionArns' --output text)
   if [[ -n "$arns" && "$arns" != "None" ]]; then
