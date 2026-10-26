@@ -97,7 +97,7 @@ m36 ::: BRU ::: modules/access/main.tf ::: sub ::: Resource = ["${local.arn}:bac
 m37 ::: BRU ::: modules/access/main.tf ::: sub ::: max_session_duration = 3600 ::: max_session_duration = 43200 ::: tests/unit/access.tftest.hcl::access_trust_defaults_to_this_account_only
 m38 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: status = "Enabled" ::: status = "Suspended" ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only
 m39 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: block_public_acls       = true ::: block_public_acls       = false ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only
-m40 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: "repo:${var.github_repo}:ref:refs/heads/${var.github_branch}" ::: "repo:${var.github_repo}:*" ::: tests/unit/bootstrap.tftest.hcl::github_role_trusts_exactly_one_repo_and_branch
+m40 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: "ref:refs/heads/${var.github_branch}" ::: "*" ::: tests/unit/bootstrap.tftest.hcl::github_role_trusts_exactly_one_repo_and_branch
 m41 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: policy/PowerUserAccess ::: policy/AdministratorAccess ::: tests/unit/bootstrap.tftest.hcl::github_role_iam_is_scoped_and_cannot_touch_itself
 m42 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: Resource = "arn:${local.partition}:iam::${local.account}:role/${var.name}-*" ::: Resource = "*" ::: tests/unit/bootstrap.tftest.hcl::github_role_iam_is_scoped_and_cannot_touch_itself
 m43 ::: CI ::: modules/bootstrap/main.tf ::: sub ::: force_destroy = var.allow_state_destroy ::: force_destroy = true ::: tests/unit/bootstrap.tftest.hcl::state_bucket_is_private_versioned_encrypted_tls_only

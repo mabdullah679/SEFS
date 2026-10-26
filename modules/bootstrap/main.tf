@@ -98,12 +98,20 @@ locals {
   # Both are StringEquals: no wildcards anywhere in the trust.
   github_owner = var.github_repo == null ? "" : split("/", var.github_repo)[0]
   github_name  = var.github_repo == null ? "" : split("/", var.github_repo)[1]
-  github_subs = var.github_repo == null ? [] : compact([
-    "repo:${var.github_repo}:ref:refs/heads/${var.github_branch}",
+  # GitHub emits the ID-pinned form (owner@id/repo@id) today and the plain form historically; a job with
+  # `environment:` presents ":environment:<name>" instead of ":ref:refs/heads/<branch>". All are listed
+  # exactly (StringEquals, no wildcards).
+  github_repo_forms = var.github_repo == null ? [] : compact([
+    var.github_repo,
     var.github_owner_id != null && var.github_repo_id != null
-    ? "repo:${local.github_owner}@${var.github_owner_id}/${local.github_name}@${var.github_repo_id}:ref:refs/heads/${var.github_branch}"
+    ? "${local.github_owner}@${var.github_owner_id}/${local.github_name}@${var.github_repo_id}"
     : "",
   ])
+  github_claims = compact([
+    "ref:refs/heads/${var.github_branch}",
+    var.github_environment != "" ? "environment:${var.github_environment}" : "",
+  ])
+  github_subs = flatten([for r in local.github_repo_forms : [for c in local.github_claims : "repo:${r}:${c}"]])
 
   oidc_provider_arn = var.github_repo == null ? null : (
     var.create_oidc_provider

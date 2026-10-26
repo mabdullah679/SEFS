@@ -7,7 +7,7 @@ Owner's intent (2026-10-25): set the project up once; afterwards, pushing to `ma
 `check full` in the message forces a full apply regardless of which paths changed (use it after a failed or cancelled run, or when a child was added).
 
 1. **Unit job** (every push, no AWS): `tests/unit/run.sh` (mocked Terraform), `tests/ci/selftest.sh`.
-2. **Deploy job** (only if the commit message contains `check`):
+2. **Deploy job** (only if the commit message contains the whole word `check`; a shell gate with `grep -qiw` decides, so `checks`/`checked`/`rechecked` do not deploy):
    - assumes the deploy role via OIDC (no AWS keys in GitHub),
    - `scripts/changed-children.sh <before> <head>` maps changed paths to child modules ([COMPONENTS.md](COMPONENTS.md) is the human version):
      `modules/<x>/**` → `x`; `apps/**` → `images apps`; root `*.tf`/`*.tfvars` → **full**; docs/tests/bruno/scripts → **none**; anything unknown → **full** (fail safe),
@@ -24,9 +24,9 @@ Concurrency: one deploy at a time (`concurrency: sefs-deploy`), and the DynamoDB
 1. `./setup.sh` → at step 3b answer the GitHub repo as `owner/repo`. This runs `make bootstrap GITHUB_REPO=owner/repo`, which creates, with **local** state in [`bootstrap/`](../bootstrap/main.tf):
    - state bucket `sefs-tfstate-<account>-<region>` (versioned, encrypted, private, TLS-only),
    - lock table `sefs-tfstate-lock`,
-   - GitHub OIDC provider + role `sefs-github-deploy`, trusted **only** by `repo:owner/repo:ref:refs/heads/main`,
+   - GitHub OIDC provider + role `sefs-github-deploy`, trusted **only** by exact subjects for your repo: the branch form `repo:owner/repo:ref:refs/heads/main` and, because the deploy job runs in the `production` environment, the environment form `repo:owner/repo:environment:production` (each also in GitHub's ID-pinned spelling; no wildcards),
    and writes `backend.hcl` (git-ignored). Keep `bootstrap/terraform.tfstate`: it is the only record of the state bucket.
-2. In the GitHub repo → Settings → Secrets and variables → Actions → **Variables**:
+2. `setup.sh` step 3c prints the five values and, if the GitHub CLI is signed in (`gh auth status`), offers to set them for you. Otherwise, in the GitHub repo → Settings → Secrets and variables → Actions → **Variables**:
 
    | Variable | Value |
    |---|---|
@@ -54,6 +54,8 @@ Already have a GitHub OIDC provider in the account? AWS allows one per issuer: r
 - **A watchdog must not hold Terraform's pipes.** The image-push watchdog's `sleep` inherited the local-exec stdout; Terraform waits for EOF, so a push that finished in 1 minute "completed" after the full 40-minute timeout. Now the watchdog runs with its fds detached and its `sleep` is killed explicitly; the proof runs the loop under `$(...)` and times it.
 - **A cancelled apply can orphan ECS services.** AWS had `sefs-writer`/`sefs-reader`, state did not, and the next `CreateService` failed ("not idempotent"). `scripts/adopt-orphans.sh` imports such services before every apply (`make up` and CI).
 
+- **A job with `environment:` presents a different `sub`.** Observed 2026-10-26 (run 40260843203): once the deploy job gained `environment: production`, the claim became `repo:mabdullah679@131607929/SEFS@1433201237:environment:production` and the branch-only trust refused it. The trust now lists both claim forms (branch and environment); the environment's deployment-branch rule (main only) keeps the environment form on the branch.
+- **`contains(message, 'check')` is a substring test.** Two commits whose bodies said "every other check was clean" and "... checks" started gated deploy runs; one waited for approval for six hours and blocked the concurrency group. The gate is now a whole-word match.
 - **GitHub's `sub` claim carries numeric IDs.** Observed 2026-10-25 on the first "check" run: `repo:mabdullah679@131607929/SEFS@1433201237:ref:refs/heads/main`, not the documented `repo:owner/repo:ref:...`. IAM therefore refused the ID-less trust ("Not authorized to perform sts:AssumeRoleWithWebIdentity"). The role now trusts the exact ID-pinned string (plus the plain form), still `StringEquals`, no wildcards; `make bootstrap` resolves both IDs with `gh api`. The workflow prints `iss/aud/sub` (never the token) before assuming the role so a future format change is visible in one glance.
 
 - **`aws login` sessions and the S3 backend.** Terraform 1.9's built-in backend cannot read the `login_session` profile type; the provider can. `make tf-profile SOURCE=<login profile>` creates `sefs-tf`, a `credential_process` helper that exports the same session, and `make preflight` refuses to run on a `login_session` profile. CI is unaffected (OIDC puts credentials in the environment).

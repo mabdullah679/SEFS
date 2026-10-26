@@ -42,6 +42,12 @@ variable "github_branch" {
   default     = "main"
 }
 
+variable "github_environment" {
+  description = "GitHub Actions environment the deploy job runs in (HITL approval). A job with `environment:` presents sub `repo:<owner>/<repo>:environment:<name>` instead of the branch form, so it must be trusted too; the environment's own deployment-branch rule keeps it to the branch. Empty = branch form only."
+  type        = string
+  default     = "production"
+}
+
 variable "create_oidc_provider" {
   description = "Create the GitHub OIDC provider. Set false if this account already has one (AWS allows one per issuer URL); the role then references the existing one."
   type        = bool

@@ -61,6 +61,11 @@ variable "github_branch" {
   default = "main"
 }
 
+variable "github_environment" {
+  type    = string
+  default = "production"
+}
+
 variable "create_oidc_provider" {
   type    = bool
   default = true
@@ -85,6 +90,7 @@ module "bootstrap" {
   allow_state_destroy  = var.allow_state_destroy
   github_repo          = var.github_repo
   github_branch        = var.github_branch
+  github_environment   = var.github_environment
   create_oidc_provider = var.create_oidc_provider
   github_owner_id      = var.github_owner_id
   github_repo_id       = var.github_repo_id

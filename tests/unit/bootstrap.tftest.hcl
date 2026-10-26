@@ -115,15 +115,17 @@ run "github_role_trusts_exactly_one_repo_and_branch" {
     condition = sort(tolist(jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"])) == sort(tolist([
       "repo:acme/sefs:ref:refs/heads/main",
       "repo:acme@1111/sefs@2222:ref:refs/heads/main",
+      "repo:acme/sefs:environment:production",
+      "repo:acme@1111/sefs@2222:environment:production",
     ]))
-    error_message = "sub must be exactly the ID-pinned form (repo:owner@id/repo@id:ref:refs/heads/<branch>) plus the plain form, nothing else."
+    error_message = "sub must be exactly the ID-pinned and plain repo forms, each with the branch claim and the deploy-environment claim, nothing else."
   }
   assert {
     condition = alltrue([
       for v in tolist(jsondecode(aws_iam_role.github_deploy[0].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"]) :
-      can(regex("^repo:[^:*?]+:ref:refs/heads/[^*?]+$", v))
+      can(regex("^repo:[^:*?]+:(ref:refs/heads/|environment:)[^*?]+$", v))
     ])
-    error_message = "Every sub value must be an exact repo + branch string with no wildcard."
+    error_message = "Every sub value must be an exact repo + (branch | environment) string with no wildcard."
   }
 }
 

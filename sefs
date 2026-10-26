@@ -11,6 +11,9 @@ tfvar() { sed -nE "s/^$1 *= *\"([^\"]+)\".*/\1/p" account.auto.tfvars 2>/dev/nul
 NAME="${SEFS_NAME:-$(tfvar name)}"; NAME="${NAME:-sefs}"
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(tfvar region)}}"; REGION="${REGION:-ap-southeast-2}"
 export AWS_REGION="$REGION" AWS_PAGER=""
+# A stalled API call must fail fast, not hang the screen: observed 2026-10-26, one EFS DescribeFileSystems
+# sat >3 min on the default 60 s read timeout x retries while the same call from a new process answered in 1 s.
+aws() { command aws --cli-connect-timeout 5 --cli-read-timeout 20 "$@"; }
 
 usage() {
   cat <<EOF
@@ -48,8 +51,19 @@ deployed_or_die() {
 # ---------- read-only commands
 cmd_show() {
   need aws; deployed_or_die
-  local kw="${1:-}" rows
-  rows=$(registry | { [ -n "$kw" ] && grep -i -- "$kw" || cat; })
+  local kw="${1:-}" pat rows
+  # keyword -> key pattern (synonyms first, then the word itself); values are searched only if no key matches
+  case "$(printf '%s' "$kw" | tr '[:upper:]' '[:lower:]')" in
+    efs|fs|filesystem|storage) pat='file_system|access_point|efs_' ;;
+    sg|security)               pat='security_group' ;;
+    log|logs)                  pat='log_group' ;;
+    net|network|vpc|subnet)    pat='vpc|subnet' ;;
+    ecs|service|cluster|app)   pat='cluster|service' ;;
+    alarm|alert|dash|obs)      pat='alerts|dashboard' ;;
+    *)                         pat="$kw" ;;
+  esac
+  rows=$(registry | { [ -n "$kw" ] && awk -F'\t' -v p="$pat" 'tolower($1) ~ p' || cat; })
+  [ -n "$rows" ] || rows=$(registry | grep -i -- "$kw" || true)
   [ -n "$rows" ] || die "no deployed value matches '$kw'. Keys: $(registry | cut -f1 | tr '\n' ' ')"
   printf '%s\n' "$rows" | awk -F'\t' '{printf "%-24s %s\n", $1, $2}'
 }
