@@ -16,8 +16,12 @@ label="sefs-gui-build-$$"
 # Watchdog: a stuck npm install must not hold the apply forever. Detached fds (see AGENTS.md §7).
 ( sleep "$TIMEOUT"; docker ps -q --filter "label=$label" | xargs -r docker kill ) >/dev/null 2>&1 </dev/null &
 wpid=$!
-docker run --rm --label "$label" -v "$WEB_DIR:/src:ro" -v "$OUT_DIR:/dist" "$NODE_IMAGE" sh -ec '
-  cp -R /src /work && cd /work
+# Run as the invoking user: on a Linux host (the GitHub runner) a root container leaves root-owned
+# output that the caller cannot delete afterwards (CI apply failed on `rm -rf` 2026-10-28). Docker
+# Desktop on macOS maps ownership anyway. HOME must be writable for npm's cache.
+docker run --rm --label "$label" --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/npm \
+  -v "$WEB_DIR:/src:ro" -v "$OUT_DIR:/dist" "$NODE_IMAGE" sh -ec '
+  cp -R /src /tmp/work && cd /tmp/work
   npm ci --ignore-scripts --no-audit --no-fund >/dev/null
   npx tsc -p tsconfig.json --outDir /dist/js
   cp index.html styles.css /dist/

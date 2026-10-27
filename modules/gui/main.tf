@@ -271,7 +271,7 @@ resource "terraform_data" "web" {
     }
     command = <<-EOT
       set -eu
-      work="$(mktemp -d)"; trap 'rm -rf "$work"' EXIT
+      work="$(mktemp -d)"; trap 'rm -rf "$work" 2>/dev/null || true' EXIT   # cleanup must never fail the apply
       # One build script for the apply and for `make test-web` (modules/gui/build.sh): npm ci honours
       # package-lock.json exactly (D27), three.js is copied next to the page, a watchdog bounds it.
       bash "${path.module}/build.sh" "$WEB_DIR" "$work/dist" "$NODE_IMAGE" "$BUILD_TIMEOUT"
