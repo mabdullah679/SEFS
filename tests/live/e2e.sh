@@ -268,7 +268,7 @@ e5() {
   if [ -z "$url" ]; then result UNVERIFIED E5 "GUI: not deployed (enable_gui = false)"; return; fi
   client="$(aws_ cognito-idp list-user-pool-clients --user-pool-id "$pool" --query 'UserPoolClients[0].ClientId' --output text)"
   user="e2e-probe-$(date +%s)@example.invalid"
-  pw="E2e-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 14)!x"
+  pw="E2e-$(openssl rand -hex 8)!x"   # not `tr </dev/urandom | head -c`: under pipefail, head closing the pipe killed tr (SIGPIPE) and set -e ended the script before E5 printed (2026-10-27)
   trap 'aws_ cognito-idp admin-delete-user --user-pool-id "$pool" --username "$user" >/dev/null 2>&1 || true' RETURN
   aws_ cognito-idp admin-create-user --user-pool-id "$pool" --username "$user" --message-action SUPPRESS \
     --user-attributes Name=email,Value="$user" Name=email_verified,Value=true >/dev/null

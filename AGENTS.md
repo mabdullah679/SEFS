@@ -100,6 +100,7 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 - GitHub's OIDC `sub` claim now includes numeric IDs (`repo:owner@id/repo@id:ref:…`) → the deploy role trusts that exact string.
 - The image-push watchdog once held Terraform's stdout pipe (orphaned `sleep`) → a 1-minute push "took" 40 minutes; watchdog fds are now detached.
 - A cancelled apply left ECS services in AWS but not in state → `scripts/adopt-orphans.sh` runs before every apply.
+- Terraform through the `sefs-tf` helper profile stalled for minutes and then failed with "credential process timed out: signal: killed" (2026-10-27): the `aws login` session token lives ~15 min and its refresh took 73 s on a slow link, longer than the SDK's 60 s limit for a `credential_process`. The CLI itself was never slow. Workaround while a long Terraform op runs: keep the token fresh from another shell (`while true; do aws sts get-caller-identity --profile <login profile> >/dev/null; sleep 240; done`), so the helper answers from cache. A killed `terraform console` also left a stale state lock (`terraform force-unlock <id>` clears it).
 - A fixed task-role name would be locked out of the EFS if the role were ever recreated → `name_prefix`.
 
 ## 7b. Standing rules (owner, 2026-10-25)
