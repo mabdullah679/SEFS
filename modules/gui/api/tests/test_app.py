@@ -122,11 +122,13 @@ def canned(efs_ingress_ok: bool = True, reader_running: int = 1) -> dict[str, An
             {"AlarmName": "sefs-reader-write-allowed", "StateValue": "INSUFFICIENT_DATA", "MetricName": "WriteProbeAllowed", "StateReason": "no data"}]},
         "ec2.describe_route_tables": {"RouteTables": [{"RouteTableId": "rtb-1", "Associations": [{"SubnetId": "sub-pri-a"}], "Routes": [{"DestinationCidrBlock": "0.0.0.0/0", "NatGatewayId": "nat-a"}]}]},
         "ec2.describe_internet_gateways": {"InternetGateways": [{"InternetGatewayId": "igw-1"}]},
+        # Usagetypes as the Pricing API really names them (same strings scripts/cost.py matched live 2026-10-26);
+        # the only filter the API may send is the NAT Gateway family on AmazonEC2 (asserted in test c05).
         "pricing.get_products": lambda kw: {"PriceList": {
-            "AmazonEC2": [price("APS2-NatGateway-Hours", "Hrs", "0.059")],
-            "AmazonVPC": [price("APS2-PublicIPv4:InUseAddress", "Hrs", "0.005")],
-            "AmazonECS": [price("APS2-Fargate-ARM-vCPU-Hours:perCPU", "hours", "0.03885"), price("APS2-Fargate-ARM-GB-Hours", "hours", "0.00426")],
-            "AmazonCloudWatch": [price("APS2-AlarmMonitorUsage", "Alarms", "0.10")]}[kw["ServiceCode"]]},
+            "AmazonEC2": [price("APS2-NatGateway-Hours", "Hrs", "0.059"), price("APS2-NatGateway-Bytes", "GB", "0.059")],
+            "AmazonVPC": [price("APS2-PublicIPv4:InUseAddress", "Hrs", "0.005"), price("APS2-PublicIPv4:IdleAddress", "Hrs", "0.005")],
+            "AmazonECS": [price("APS2-Fargate-ARM-vCPU-Hours:perCPU", "hours", "0.03885"), price("APS2-Fargate-ARM-GB-Hours", "hours", "0.00426"), price("APS2-Fargate-vCPU-Hours:perCPU", "hours", "0.04856")],
+            "AmazonCloudWatch": [price("APS2-CW:AlarmMonitorUsage", "Alarms", "0.10"), price("APS2-CW:AlarmMonitorUsage", "Alarm-Month", "0.30"), price("APS2-CW:MetricMonitorUsage", "Metrics", "0.30")]}[kw["ServiceCode"]]},
         "ce.get_cost_and_usage": {"ResultsByTime": [{"TimePeriod": {"Start": "2026-10-25"}, "Total": {"UnblendedCost": {"Amount": "2.2"}}},
                                                     {"TimePeriod": {"Start": "2026-10-26"}, "Total": {"UnblendedCost": {"Amount": "0.3"}}}]},
         "logs.describe_log_streams": {"logStreams": [{"logStreamName": "s1"}]},
@@ -216,7 +218,7 @@ class CostTest(unittest.TestCase):
         self.assertEqual(body["live"]["natGateways"], 2)
         self.assertAlmostEqual(body["live"]["vcpu"], 0.75)
         self.assertAlmostEqual(body["live"]["memoryGb"], 1.5)
-        expect = 2 * 0.059 + 2 * 0.005 + 0.75 * 0.03885 + 1.5 * 0.00426 + 2 * 0.10 / 720
+        expect = 2 * 0.059 + 2 * 0.005 + 0.75 * 0.03885 + 1.5 * 0.00426 + 2 * 0.10 / 720 + 20 * 0.30 / 720
         self.assertAlmostEqual(body["rates"]["perHour"], expect, places=6)
         self.assertAlmostEqual(body["rates"]["per30Days"], expect * 720, places=4)
         self.assertEqual(body["actuals"]["totalUsd"], 2.5)
@@ -230,7 +232,7 @@ class CostTest(unittest.TestCase):
     def test_c02_stale_cache_is_refetched(self) -> None:
         router, fake = make_router(canned())
         old = {"items": [], "perHour": 0, "perMinute": 0, "per30Days": 0, "fetchedAt": "2026-10-25T00:00:00+00:00"}
-        fake.responses["_cache"] = {"/sefs/gui/cache/rates-ap-southeast-2-2-0.75-1.5-2": json.dumps(old)}
+        fake.responses["_cache"] = {"/sefs/gui/cache/rates-ap-southeast-2-2-0.75-1.5-2-2": json.dumps(old)}
         _, body = get(router, "/api/cost")
         self.assertGreater(body["rates"]["perHour"], 0, "a >24 h cache entry must not be served")
 
@@ -241,6 +243,22 @@ class CostTest(unittest.TestCase):
         _, body = get(router, "/api/cost")
         self.assertIn("error", body["actuals"])
         self.assertIn("AccessDenied", body["actuals"]["error"])
+
+    def test_c05_pricing_filters_mirror_cost_py(self) -> None:
+        router, fake = make_router(canned())
+        get(router, "/api/cost")
+        calls = {c[2]["ServiceCode"]: c[2]["Filters"] for c in fake.calls if c[1] == "get_products"}
+        self.assertEqual(set(calls), {"AmazonEC2", "AmazonVPC", "AmazonECS", "AmazonCloudWatch"})
+        for svc, filters in calls.items():
+            fields = {f["Field"] for f in filters}
+            self.assertIn("location", fields)
+            self.assertEqual(fields - {"location"}, {"productFamily"} if svc == "AmazonEC2" else set(), f"{svc}: a narrowing filter beyond location returned nothing live (2026-10-27)")
+
+    def test_c06_unknown_region_fails_loudly(self) -> None:
+        router, _ = make_router(canned(), env={"SEFS_REGION": "af-south-1"})
+        status, body = get(router, "/api/cost")
+        self.assertEqual(status, 502)
+        self.assertIn("Pricing.PREFIX", body["error"])
 
     def test_c04_actuals_off_means_no_cost_explorer_call(self) -> None:
         router, fake = make_router(canned(), env={"SEFS_COST_ACTUALS": "false"})

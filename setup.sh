@@ -131,15 +131,17 @@ if [ -n "$gh_repo" ] && [ -f backend.hcl ]; then
   ci_bucket="$(sed -nE 's/^bucket *= *"([^"]+)".*/\1/p' backend.hcl)"
   ci_table="$(sed -nE 's/^dynamodb_table *= *"([^"]+)".*/\1/p' backend.hcl)"
   ci_role="$(terraform -chdir=bootstrap output -raw github_deploy_role_arn 2>/dev/null || true)"
-  printf '      %s=%s\n' AWS_REGION "$region" AWS_ACCOUNT_ID "$acct" AWS_DEPLOY_ROLE_ARN "${ci_role:-<bootstrap output github_deploy_role_arn>}" TF_STATE_BUCKET "$ci_bucket" TF_LOCK_TABLE "$ci_table"
+  printf '      %s=%s\n' AWS_REGION "$region" AWS_ACCOUNT_ID "$acct" AWS_DEPLOY_ROLE_ARN "${ci_role:-<bootstrap output github_deploy_role_arn>}" TF_STATE_BUCKET "$ci_bucket" TF_LOCK_TABLE "$ci_table" GUI_ADMIN_EMAIL "${gui_email:-<blank: the map gets no first user when CI deploys>}"
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 && [ -n "$ci_role" ]; then
-    if [ "$(ask "gh_vars:$gh_repo" "Set these 5 variables on $gh_repo now with the GitHub CLI? [y/N]")" = "y" ]; then
+    if [ "$(ask "gh_vars:$gh_repo" "Set these variables on $gh_repo now with the GitHub CLI? [y/N]")" = "y" ]; then
       gh variable set AWS_REGION --body "$region" -R "$gh_repo" && gh variable set AWS_ACCOUNT_ID --body "$acct" -R "$gh_repo" \
         && gh variable set AWS_DEPLOY_ROLE_ARN --body "$ci_role" -R "$gh_repo" && gh variable set TF_STATE_BUCKET --body "$ci_bucket" -R "$gh_repo" \
-        && gh variable set TF_LOCK_TABLE --body "$ci_table" -R "$gh_repo" && ok "5 variables set on $gh_repo; a push to main with 'check' now deploys"
+        && gh variable set TF_LOCK_TABLE --body "$ci_table" -R "$gh_repo" \
+        && { [ -z "$gui_email" ] || gh variable set GUI_ADMIN_EMAIL --body "$gui_email" -R "$gh_repo"; } \
+        && ok "variables set on $gh_repo; a push to main with 'check' now deploys (a CI deploy creates the map user from GUI_ADMIN_EMAIL)"
     else warn "not set; add them under Settings > Secrets and variables > Actions > Variables (docs/CI.md)"; fi
   else
-    warn "GitHub CLI not signed in (or no role ARN yet): add the 5 values above under Settings > Secrets and variables > Actions > Variables (docs/CI.md)"
+    warn "GitHub CLI not signed in (or no role ARN yet): add the values above under Settings > Secrets and variables > Actions > Variables (docs/CI.md)"
   fi
 fi
 

@@ -10,7 +10,7 @@ A person can be kept in the loop: the deploy runs in a GitHub "environment" call
 
 ONE-TIME SETUP (about 10 minutes)
 1. Run ./setup.sh and, when asked, give your GitHub repo as owner/repo. That creates the shared state storage (a private, versioned, encrypted bucket and a lock table) and a deploy role that only that repo's main branch can use. Keep the small bootstrap/terraform.tfstate file; it is the only record of the state bucket.
-2. setup.sh prints the five GitHub values (region, account, deploy role, state bucket, lock table) and, if you are signed in to the GitHub command line, offers to set them for you. Otherwise add them yourself under the repo's Actions variables. No secrets are needed.
+2. setup.sh prints the five GitHub values (region, account, deploy role, state bucket, lock table) plus the optional map-login e-mail (without it a deploy from GitHub creates no map user) and, if you are signed in to the GitHub command line, offers to set them for you. Otherwise add them yourself under the repo's Actions variables. No secrets are needed.
 3. Push to main with the word "check" in the message. Writing "check full" deploys everything regardless of what changed; use it after a failed or cancelled run.
 
 AFTER SETUP

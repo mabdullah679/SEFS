@@ -26,7 +26,7 @@ Concurrency: one deploy at a time (`concurrency: sefs-deploy`), and the DynamoDB
    - lock table `sefs-tfstate-lock`,
    - GitHub OIDC provider + role `sefs-github-deploy`, trusted **only** by exact subjects for your repo: the branch form `repo:owner/repo:ref:refs/heads/main` and, because the deploy job runs in the `production` environment, the environment form `repo:owner/repo:environment:production` (each also in GitHub's ID-pinned spelling; no wildcards),
    and writes `backend.hcl` (git-ignored). Keep `bootstrap/terraform.tfstate`: it is the only record of the state bucket.
-2. `setup.sh` step 3c prints the five values and, if the GitHub CLI is signed in (`gh auth status`), offers to set them for you. Otherwise, in the GitHub repo → Settings → Secrets and variables → Actions → **Variables**:
+2. `setup.sh` step 3c prints the five values (plus the optional `GUI_ADMIN_EMAIL`, the map's first user) and, if the GitHub CLI is signed in (`gh auth status`), offers to set them for you. Otherwise, in the GitHub repo → Settings → Secrets and variables → Actions → **Variables**:
 
    | Variable | Value |
    |---|---|
@@ -35,6 +35,7 @@ Concurrency: one deploy at a time (`concurrency: sefs-deploy`), and the DynamoDB
    | `AWS_DEPLOY_ROLE_ARN` | `make -C bootstrap output` → `github_deploy_role_arn` |
    | `TF_STATE_BUCKET` | `bootstrap` output `state_bucket` |
    | `TF_LOCK_TABLE` | `bootstrap` output `lock_table` |
+   | `GUI_ADMIN_EMAIL` (optional) | the e-mail Cognito invites as the map's first user; unset = a CI deploy creates no map user (`./sefs map` still works for users added later) |
 
    No secrets are needed: OIDC replaces access keys.
 3. Push to `main` with `check` in the message.

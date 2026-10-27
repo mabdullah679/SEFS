@@ -119,7 +119,7 @@ module "gui" {
 
   name              = var.name
   region            = var.region
-  admin_email       = var.gui_admin_email
+  admin_email       = var.gui_admin_email == null || var.gui_admin_email == "" ? null : var.gui_admin_email # CI passes "" when the repo variable is unset
   ssm_prefix        = module.access.ssm_prefix
   writer_log_group  = module.apps.writer_log_group
   reader_log_group  = module.apps.reader_log_group

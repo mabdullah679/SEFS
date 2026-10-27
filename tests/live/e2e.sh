@@ -51,7 +51,7 @@ for t in aws jq "$TF"; do command -v "$t" >/dev/null || { say "missing tool: $t"
 
 OUT="$("$TF" output -json)"
 o() { jq -r --arg k "$1" '.[$k].value // empty | if type=="array" then join(",") else . end' <<<"$OUT"; }
-REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(echo var.region | "$TF" console | tr -d '"')}}"
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(o region)}}"   # from outputs: `terraform console` under remote state hung for 16 min when AWS_REGION was unset (2026-10-27)
 NAME="$(o name)"   # from outputs: under remote state `terraform console` prints "Acquiring state lock..." into stdout
 CLUSTER="$(o cluster_name)"; SVC_W="$(o writer_service_name)"; SVC_R="$(o reader_service_name)"
 LG_W="$(o writer_log_group)"; LG_R="$(o reader_log_group)"

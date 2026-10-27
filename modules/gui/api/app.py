@@ -387,17 +387,26 @@ class RateCache:
 
 
 class Pricing:
-    """Rates from the AWS Pricing API for the stack's billable items (quantities mirror scripts/cost.py)."""
+    """Rates from the AWS Pricing API for the stack's billable items. Lookups mirror scripts/cost.py exactly
+    (same services, same usagetype prefixes, same unit filters): that script is the proven reference
+    (2026-10-26). A productFamily filter on AmazonVPC and a unit filter on the IPv4 line returned nothing
+    live (2026-10-27, 502), so only AmazonEC2 is narrowed (to the NAT Gateway family: tens of thousands of
+    SKUs otherwise)."""
 
     LOCATION = {
         "ap-southeast-2": "Asia Pacific (Sydney)", "us-east-1": "US East (N. Virginia)", "us-west-2": "US West (Oregon)",
         "eu-west-1": "EU (Ireland)", "eu-central-1": "EU (Frankfurt)", "ap-southeast-1": "Asia Pacific (Singapore)",
         "ap-northeast-1": "Asia Pacific (Tokyo)",
     }
+    PREFIX = {"ap-southeast-2": "APS2", "us-east-1": "USE1", "us-west-2": "USW2", "eu-west-1": "EU",
+              "eu-central-1": "EUC1", "ap-southeast-1": "APS1", "ap-northeast-1": "APN1"}
 
     def __init__(self, aws: Aws, region: str) -> None:
         self._aws, self._region = aws, region
-        self._location = self.LOCATION.get(region, region)
+        if region not in self.PREFIX:
+            raise LookupError(f"no Pricing usagetype prefix known for region {region} (add it to Pricing.PREFIX, as in scripts/cost.py)")
+        self._location = self.LOCATION[region]
+        self._pf = self.PREFIX[region]
 
     def _rows(self, service: str, extra: list[dict[str, str]]) -> list[tuple[str, str, float]]:
         pricing = self._aws.client("pricing", region="us-east-1")
@@ -428,17 +437,20 @@ class Pricing:
             raise LookupError(f"no price for usagetype~{usage_contains} unit~{unit_contains}")
         return min(h[2] for h in hits)
 
-    def rates(self, nat_count: int, vcpu: float, memory_gb: float, alarms: int) -> dict[str, Any]:
+    def rates(self, nat_count: int, vcpu: float, memory_gb: float, alarms: int, services: int = 2) -> dict[str, Any]:
+        pf = self._pf
+        metrics = services * 10  # Container Insights publishes ~10 custom metrics per service (same estimate as scripts/cost.py)
         ec2 = self._rows("AmazonEC2", [{"Type": "TERM_MATCH", "Field": "productFamily", "Value": "NAT Gateway"}])
-        vpc = self._rows("AmazonVPC", [{"Type": "TERM_MATCH", "Field": "productFamily", "Value": "IP Address"}])
-        ecs = self._rows("AmazonECS", [{"Type": "TERM_MATCH", "Field": "cpuArchitecture", "Value": "ARM"}])
-        cw = self._rows("AmazonCloudWatch", [{"Type": "TERM_MATCH", "Field": "productFamily", "Value": "Alarm"}])
+        vpc = self._rows("AmazonVPC", [])
+        ecs = self._rows("AmazonECS", [])
+        cw = self._rows("AmazonCloudWatch", [])
         items = [
-            {"item": f"NAT gateways x{nat_count}", "perHour": nat_count * self._rate(ec2, "NatGateway-Hours", "Hrs")},
-            {"item": f"Public IPv4 on NATs x{nat_count}", "perHour": nat_count * self._rate(vpc, "PublicIPv4:InUseAddress", "Hrs")},
-            {"item": f"Fargate ARM vCPU ({vcpu})", "perHour": vcpu * self._rate(ecs, "Fargate-ARM-vCPU-Hours", "hours")},
-            {"item": f"Fargate ARM memory ({memory_gb} GB)", "perHour": memory_gb * self._rate(ecs, "Fargate-ARM-GB-Hours", "hours")},
-            {"item": f"CloudWatch alarms x{alarms}", "perHour": alarms * self._rate(cw, "AlarmMonitorUsage") / HOURS_30D},
+            {"item": f"NAT gateways x{nat_count}", "perHour": nat_count * self._rate(ec2, f"{pf}-NatGateway-Hours")},
+            {"item": f"Public IPv4 on NATs x{nat_count}", "perHour": nat_count * self._rate(vpc, f"{pf}-PublicIPv4:InUseAddress")},
+            {"item": f"Fargate ARM vCPU ({vcpu})", "perHour": vcpu * self._rate(ecs, f"{pf}-Fargate-ARM-vCPU-Hours")},
+            {"item": f"Fargate ARM memory ({memory_gb} GB)", "perHour": memory_gb * self._rate(ecs, f"{pf}-Fargate-ARM-GB-Hours")},
+            {"item": f"CloudWatch alarms x{alarms}", "perHour": alarms * self._rate(cw, f"{pf}-CW:AlarmMonitorUsage", "Alarms") / HOURS_30D},
+            {"item": f"Container Insights metrics (~{metrics})", "perHour": metrics * self._rate(cw, f"{pf}-CW:MetricMonitorUsage", "Metrics") / HOURS_30D},
         ]
         per_hour = sum(i["perHour"] for i in items)
         return {"items": items, "perHour": per_hour, "perMinute": per_hour / 60, "per30Days": per_hour * HOURS_30D,
@@ -473,10 +485,11 @@ class Cost:
         tasks = [n for n in nodes if n.kind == "task"]
         vcpu = sum(int(t.facts.get("cpu") or 0) for t in tasks) / 1024
         mem = sum(int(t.facts.get("memory") or 0) for t in tasks) / 1024
-        key = f"rates-{self._s.region}-{nat_count}-{vcpu}-{mem}-{alarms}"
+        services = sum(1 for n in nodes if n.kind == "service")
+        key = f"rates-{self._s.region}-{nat_count}-{vcpu}-{mem}-{alarms}-{services}"
         rates = self._cache.get(key)
         if rates is None:
-            rates = Pricing(self._aws, self._s.region).rates(nat_count, vcpu, mem, alarms)
+            rates = Pricing(self._aws, self._s.region).rates(nat_count, vcpu, mem, alarms, services)
             rates["fetchedAt"] = utc_now().isoformat()
             self._cache.put(key, rates)
         actuals: dict[str, Any] | None = None

@@ -53,7 +53,7 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 | Goal | Command | Notes |
 |---|---|---|
-| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying; step 3c sets the five GitHub Actions variables through `gh` when signed in. Prompt answers are cached 24 h from entry, per boot session (`~/.cache/sefs/inputs.tsv`, keyed by kernel boot time; never secrets); `./sefs forget` clears, `SEFS_NO_CACHE=1` bypasses |
+| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying; step 3c sets the GitHub Actions variables (five, plus `GUI_ADMIN_EMAIL` for the map's first user) through `gh` when signed in. Prompt answers are cached 24 h from entry, per boot session (`~/.cache/sefs/inputs.tsv`, keyed by kernel boot time; never secrets); `./sefs forget` clears, `SEFS_NO_CACHE=1` bypasses |
 | Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` · `./sefs burn` · `./sefs map` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed. `burn` = hours up (EFS creation time) × US$0.174/h (`SEFS_RATE_PER_HOUR`) |
 | Deploy / redeploy | `make up` or `./sefs up` (`AUTO=1` skips the prompt) | preflight refuses the wrong account, a missing `backend.hcl`, or an `aws login` session profile (see §7) |
 | One child | `make apply-one CHILD=efs` | |
@@ -104,7 +104,7 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 
 ## 7b. Standing rules (owner, 2026-10-25)
 
-Deterministic (everything pinned: D27), OOP where the language has objects (D28), a human approves CI deploys unless the client removes the environment reviewer (D29), no account-specific values in code (`account.auto.tfvars` + five repo variables are the only inputs), no secrets anywhere but SSM.
+Deterministic (everything pinned: D27), OOP where the language has objects (D28), a human approves CI deploys unless the client removes the environment reviewer (D29), no account-specific values in code (`account.auto.tfvars` + the repo variables are the only inputs; `GUI_ADMIN_EMAIL` is the sixth, optional), no secrets anywhere but SSM.
 
 **Credits are finite (owner, 2026-10-27).** The stack burns ≈ US$0.174/h (≈ US$4.20/day) for every hour it is up, credits or not; a `check` push leaves it up. An agent never runs `make up`, `make e2e`, or pushes with `check` on its own: the owner tests manually and tears down. `make up` and `setup.sh` print the burn warning; `./sefs burn` / `./sefs status` show the running total (D31).
 
