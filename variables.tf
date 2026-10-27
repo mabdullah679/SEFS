@@ -123,6 +123,18 @@ variable "alert_email" {
   default     = null
 }
 
+variable "enable_gui" {
+  description = "Deploy the 2.5D map (modules/gui: Cognito login, CloudFront + S3 page, read-only Lambda API). D23: an optional sidewagon; false skips it entirely."
+  type        = bool
+  default     = true
+}
+
+variable "gui_admin_email" {
+  description = "First map user; Cognito e-mails a temporary password (nothing secret enters state). null = create no user. setup.sh fills this from the alarm e-mail when left blank."
+  type        = string
+  default     = null
+}
+
 variable "activate_cost_allocation_tag" {
   description = "Activate the Project cost allocation tag (needs billing permissions; opt-in)."
   type        = bool

@@ -110,10 +110,13 @@ if [ -f account.auto.tfvars ] && ! grep -q "\"$acct\"" account.auto.tfvars; then
   warn "account.auto.tfvars points at a different account; replacing it"
 fi
 alert_email="$(ask alert_email "Email for alarm notifications (blank = none; you confirm the SNS subscription mail once):")"
+gui_email="$(ask gui_admin_email "Email for the 2.5D map login (blank = the alarm e-mail; Cognito mails a temporary password):")"
+gui_email="${gui_email:-$alert_email}"
 umask 077
 {
   printf 'allowed_account_id = "%s"\nregion             = "%s"\n' "$acct" "$region"
   [ -n "$alert_email" ] && printf 'alert_email        = "%s"\n' "$alert_email"
+  [ -n "$gui_email" ] && printf 'gui_admin_email    = "%s"\n' "$gui_email"
 } > account.auto.tfvars
 git check-ignore -q account.auto.tfvars || die "account.auto.tfvars is NOT git-ignored; refusing to continue"
 ok "account.auto.tfvars written (allowed_account_id=$acct, region=$region)"
@@ -186,6 +189,8 @@ if [ "$DEPLOY" = 1 ]; then
   make up AUTO=1
   echo
   ok "deployed. Next: 'make verify' (live checks), 'make e2e' (behaviour), 'make bruno' (Bruno collection), 'CONFIRM_DESTROY_DATA=yes make down' (teardown)"
+  gui_url="$(terraform output -raw gui_url 2>/dev/null || true)"
+  [ -n "$gui_url" ] && ok "the map: $gui_url  (sign in with the temporary password Cognito e-mailed to ${gui_email:-the map user}; './sefs map' prints this again)"
   warn "the stack is LIVE and burning ≈US\$0.17/h of credits; './sefs burn' shows the running total, './sefs down' stops it"
 else
   ok "--no-deploy: stopping before 'make up'"

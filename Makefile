@@ -5,7 +5,7 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile cost preflight init up apply-one plan test test-unit test-mutation test-contract verify e2e down
+.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile cost preflight init up apply-one plan test test-unit test-mutation test-contract test-api test-web verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -56,7 +56,13 @@ apply-one: init ## Update one child only: make apply-one CHILD=efs
 plan: init ## Show pending changes against the shared state
 	$(TF) plan
 
-test: test-unit test-mutation test-contract test-setup ## All local (fake-AWS + Docker) proofs
+test: test-unit test-mutation test-contract test-setup test-api test-web ## All local (fake-AWS + Docker) proofs
+
+test-api: ## The map's read-only API against a fake boto3 (no AWS, no network)
+	python3 -m unittest discover -s modules/gui/api/tests -v
+
+test-web: ## Build the map page exactly as the apply does (pinned Node in Docker): type-check + vendored three.js
+	@out=$$(mktemp -d "$${TMPDIR:-/tmp}/sefs-web.XXXXXX"); bash modules/gui/build.sh modules/gui/web "$$out" && rm -rf "$$out"
 
 test-unit: ## terraform test against mocked AWS (offline, -backend=false)
 	bash tests/unit/run.sh

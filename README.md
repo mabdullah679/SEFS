@@ -1,6 +1,6 @@
 # SEFS — Shared EFS for a Python writer and a Spring Boot reader
 
-One Terraform apply builds, in your AWS account, a multi-AZ VPC, an encrypted EFS shared by two ECS Fargate apps (a Python writer and a Spring Boot reader on the same path, the reader unable to write), 35-day backups, an IA lifecycle, alarms and a dashboard, a read-only verification role, and the state/CI plumbing so that every later change deploys itself from a push to `main`.
+One Terraform apply builds, in your AWS account, a multi-AZ VPC, an encrypted EFS shared by two ECS Fargate apps (a Python writer and a Spring Boot reader on the same path, the reader unable to write), 35-day backups, an IA lifecycle, alarms and a dashboard, a read-only verification role, a login-gated 2.5D map of the live stack, and the state/CI plumbing so that every later change deploys itself from a push to `main`.
 Implements [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx); requirements are numbered R1–R15 in [PLAN.md §1](PLAN.md#1-requirements-numbered-so-every-file-and-test-can-cite-one). Agents: read [AGENTS.md](AGENTS.md) first.
 
 **Run this single command and enter inputs where requested:** `./sefs setup` (after signing in to AWS in your shell). Everything else is `./sefs <verb>`; `./sefs help` lists them. [sefs](sefs) is a thin wrapper over [setup.sh](setup.sh), the [Makefile](Makefile) and the SSM registry; the longer steps below are the same thing spelled out.
@@ -22,19 +22,21 @@ Implements [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx);
            writer AP 1001:1000 rw     reader AP 1002:1000, write DENIED by policy  │
                  ECR (2 repos)   CloudWatch (logs, dashboard)   SSM /sefs/outputs/* │
                                                                                    └┘
+  browser ──Cognito login──► CloudFront ──► S3 page (2.5D map)
+          ──JWT──► HTTP API ──► Lambda (read-only role) ──► the stack above, by tag + SSM
 ```
 
-Nothing is emulated: it needs a **real AWS account** and, for the automation, a **GitHub repository you own**. Container images are built on your machine (or the GitHub runner) and pushed to ECR during the apply.
+Nothing is emulated: it needs a **real AWS account** and, for the automation, a **GitHub repository you own**. Container images and the map's page are built on your machine (or the GitHub runner) inside the apply.
 
 ## Prerequisites
 
-- An AWS account you can administer, and a login for it (`aws login`, SSO or keys). The deploy needs rights to create VPC, EFS, ECS, ECR, IAM roles, AWS Backup, CloudWatch, SNS, SSM, S3 and DynamoDB.
+- An AWS account you can administer, and a login for it (`aws login`, SSO or keys). The deploy needs rights to create VPC, EFS, ECS, ECR, IAM roles, AWS Backup, CloudWatch, SNS, SSM, S3, DynamoDB, and for the map: Cognito, CloudFront, Lambda and API Gateway.
 - A GitHub repository you own (empty is fine) to hold your copy of this code; the CI deploy role is trusted by that one repo and its `main` branch only.
 - Terraform ≥ 1.9 (tested 1.9.8; provider `hashicorp/aws` 6.70.0 pinned in [.terraform.lock.hcl](.terraform.lock.hcl)), Docker with `buildx` (tested 29.8.2), AWS CLI v2, `jq`, `make`, `bash`. macOS and Linux as-is; Windows via WSL2. Optional: `gh` (lets `setup.sh` resolve your repo's numeric IDs for the CI trust automatically), `bru` (Bruno CLI).
 - Uplink of roughly ≥ 250 KB/s: `make up` pushes ~290 MB of images, bounded by a 20-minute watchdog × 3 attempts. A healthy link pushes in under 7 min; a 35 KB/s link crawled for 2 h and broke (measured 2026-10-25). GitHub's runners have no such problem.
 - No inbound ports, no domain, no load balancer.
 
-The host does **not** need Java, Maven or Python: both apps build inside Docker.
+The host does **not** need Java, Maven, Python or Node: both apps and the map's page build inside Docker (pinned images; the Node image is ~50 MB on first use).
 
 ## Run it
 
@@ -48,7 +50,7 @@ The host does **not** need Java, Maven or Python: both apps build inside Docker.
    ```bash
    ./sefs setup        # same as ./setup.sh
    ```
-   It checks the tools, shows the account your credentials resolve to and asks you to confirm it, asks for the region, an alarm e-mail (optional) and your GitHub repo (`you/sefs`), writes the git-ignored `account.auto.tfvars`, creates the state bucket, lock table and CI role (once), prompts for any secret in [secrets.manifest](secrets.manifest) (none today) and stores it only in SSM, then runs `make up` (≈ 8 min). `./setup.sh --no-deploy` stops before the deploy.
+   It checks the tools, shows the account your credentials resolve to and asks you to confirm it, asks for the region, an alarm e-mail (optional), the map's login e-mail (blank = the alarm e-mail; Cognito mails that address a temporary password) and your GitHub repo (`you/sefs`), writes the git-ignored `account.auto.tfvars`, creates the state bucket, lock table and CI role (once), prompts for any secret in [secrets.manifest](secrets.manifest) (none today) and stores it only in SSM, then runs `make up` (≈ 8 min). `./setup.sh --no-deploy` stops before the deploy.
    Every answer you type is remembered for **24 hours from the moment you entered it, for the current boot session only** (`~/.cache/sefs/inputs.tsv`, keyed by the kernel boot time, so a restart, reboot or shutdown forgets everything); a re-run replays them and shows each one as `(cached answer …)`. Secrets are never remembered. `./sefs forget` clears the cache; `SEFS_NO_CACHE=1` ignores it for one run. Proven by `make test-setup` S6–S9.
 4. Wire CI once. `./sefs setup` prints the five values and, if the GitHub CLI is signed in, sets them for you when you answer `y`. Otherwise in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `AWS_REGION`, `AWS_ACCOUNT_ID`, `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` from `setup.sh`'s final output (no secrets: OIDC replaces keys). Details: [docs/CI.md](docs/CI.md#one-time-setup-owner-10-min).
 5. From now on, push to `main` with the whole word **`check`** in the commit message (`checks`/`checked` do not count): the changed children redeploy and the live checks run. `check full` redeploys everything.
@@ -59,6 +61,7 @@ Identical on macOS, Linux and WSL2 (`./sefs <verb>` and `make <verb>` are the sa
 ./sefs show efs                        # any deployed ID by keyword (efs, subnet, cluster, log, backup, ...) from SSM
 ./sefs status                          # services, file system, alarms, credits burned, on one screen; also: logs writer|reader, alarms, url
 ./sefs burn                            # how long the stack has been up and ≈ what it has cost so far (US$0.174/h); US$0 when nothing is deployed
+./sefs map                             # the 2.5D map's address; sign in with the e-mailed user, hover for health, click a resource to open its room
 make verify                            # every requirement checked against live AWS + plan must be clean
 E2E_CONFIRM=yes make e2e               # write/read, read-only proof with the mount flag off, persistence
 make bruno                             # the Bruno collection (after make bruno-profile SOURCE=<login profile>)
@@ -72,6 +75,8 @@ CONFIRM_DESTROY_DATA=yes make down     # deletes everything incl. the EFS data; 
 - `backend.hcl missing`: run `make bootstrap` (what `setup.sh` step 3b does).
 - A cancelled or failed run: push again with `check full`; `scripts/adopt-orphans.sh` re-attaches anything AWS kept.
 - Region: anything with ≥ 2 AZs; set it in `account.auto.tfvars` (`region = "…"`). Only `ap-southeast-2` has been exercised live.
+- The map's login mail never arrived: the user is created only when `gui_admin_email` is set; `./sefs map` prints the address, and `aws cognito-idp admin-create-user` adds another user. `enable_gui = false` in `account.auto.tfvars` removes the map entirely.
+- `make up` fails inside the map's build step: Docker must be running and able to pull `node:22.12.0-alpine3.20`; `make test-web` runs that step alone.
 
 ## What it does
 
@@ -86,6 +91,7 @@ CONFIRM_DESTROY_DATA=yes make down     # deletes everything incl. the EFS data; 
 | Backup | Daily AWS Backup, kept ≥ 35 days | R14 |
 | Destroy the apps | Data is still on the EFS; apps re-attach on the next apply | R1, R4 |
 | Something breaks | 10 alarms → SNS (apps down, EFS credits/clients, NAT port errors, backup failures, app log errors, **reader managed to write**); dashboard `sefs-overview` | ops |
+| Open the map | Sign in (Cognito, PKCE); a 2.5D plate per VPC, a column per AZ (NAT above, tasks below), the EFS slab with a mount target per AZ and both access points, backup and cluster beside it; every box coloured by live health; hover for facts, click to open the EFS / ECS / VPC / Backup room; cost panel (rates per minute, hour, 30 days, plus real spend), alarms, log tail | D23, D25, D32 |
 
 ### Spec drift: read-only reader
 
@@ -99,7 +105,9 @@ An EFS access point has **no read-only setting**; it only sets user, group and d
 | `make up` | Deploy everything (one apply) | yes (creates) |
 | `make apply-one CHILD=x` | Update one child ([docs/COMPONENTS.md](docs/COMPONENTS.md)) | yes (changes) |
 | `make plan` | Show pending changes | read-only |
-| `make test` | Unit + mutation + Docker contract + setup self-test | no |
+| `make test` | Unit + mutation + Docker contract + setup self-test + map API + map page build | no |
+| `make test-api` / `make test-web` | The map's API on a fake boto3 / the page built in Docker as the apply builds it | no |
+| `./sefs map` · `GET <api>/api/{overview,room/*,cost,logs}` | The map and its JSON (Cognito JWT required; GET only) | read-only |
 | `make verify` | Live checks + no-drift plan | read-only |
 | `E2E_CONFIRM=yes make e2e` | Live behaviour proofs | yes (one-off task; destroys + re-applies apps) |
 | `make bruno` | Bruno collection against the live stack | read-only (assumed role) |
@@ -107,7 +115,7 @@ An EFS access point has **no read-only setting**; it only sets user, group and d
 | `CONFIRM_DESTROY_DATA=yes make down` | Delete everything (+`DESTROY_STATE=yes` for the state bucket) | yes (deletes) |
 | push to `main` with `check` / `check full` | CI deploy + verify | yes |
 
-Inputs: [variables.tf](variables.tf) (all with defaults; your values go in `account.auto.tfvars`). Outputs: [outputs.tf](outputs.tf), also published to SSM `/sefs/outputs/*`.
+Inputs: [variables.tf](variables.tf) (all with defaults; your values go in `account.auto.tfvars`; `enable_gui`, `gui_admin_email`, `activate_cost_allocation_tag` govern the map). Outputs: [outputs.tf](outputs.tf), also published to SSM `/sefs/outputs/*` (`gui_url`, `gui_api_url` included).
 
 ## Bruno collection (live, read-only, self-hydrating)
 
@@ -135,13 +143,16 @@ Local suites are free and need no AWS account (mock provider, network blocked):
 make test-unit       # terraform test on mocked AWS, one run per requirement
 make test-mutation   # breaks each guard in a temp copy; every break must be caught
 make test-contract   # Docker: writer + reader on one volume, as their real UIDs
-make test-setup      # setup.sh with a fake aws: a secret never touches argv or disk
+make test-setup      # setup.sh with a fake aws: a secret never touches argv or disk; prompt answers cached per boot
+make test-api        # the map's API on a fake boto3 that refuses any non-read call
+make test-web        # the map's page compiled in the pinned Node container, as the apply does it
 ```
 
 | Suite | Result on `main` (2026-10-25) |
 |---|---|
-| Unit | 45/45 + 4/4 apply-mode (mocked) + static `prevent_destroy` check |
-| Mutation | 48/48 deliberate breaks caught; a no-op control break correctly survives |
+| Unit | 51/51 main (2026-10-27, incl. `gui.tftest.hcl` 6 runs) + 4/4 apply-mode (mocked) + static `prevent_destroy` check |
+| Mutation | 48/48 deliberate breaks caught; a no-op control break correctly survives; map rows g01–g07 (see the ledger line below) |
+| Map API (fake boto3) | 18/18: discovery, health rules (R9 on sg-efs, running ≥ desired, alarm states), rooms, rates + 24 h SSM cache + Cost Explorer failure reported not faked, logs filtered to contract lines, bad input → 400, non-read calls refused |
 | Contract (Docker) | 16/16; with the reader mounted rw it fails, as it should |
 | Setup self-test | 9/9 (2026-10-27: S6–S9 cover the 24 h per-boot input cache); mutation-proven (boot check, 24 h expiry, cache off, secret through the cache: 4/4 killed) |
 | CI mapper self-test | 9/9; mutation-proven |
@@ -167,6 +178,7 @@ make test-setup      # setup.sh with a fake aws: a secret never touches argv or 
 | [modules/apps](modules/apps/main.tf) | ECS cluster (Container Insights), task definitions, task roles, services |
 | [modules/observability](modules/observability/main.tf) | Alarms → SNS, dashboard, log-derived metrics, opt-in cost allocation tag |
 | [modules/access](modules/access/main.tf) · [modules/registry](modules/registry/main.tf) | Read-only verification role; deployed IDs in SSM |
+| [modules/gui](modules/gui/main.tf) · [api/app.py](modules/gui/api/app.py) · [web/src](modules/gui/web/src) · [build.sh](modules/gui/build.sh) | The map: Cognito, CloudFront + S3, HTTP API + Lambda (read-only); the data API; the TypeScript/three.js page; the in-apply page build |
 | [modules/bootstrap](modules/bootstrap/main.tf) · [bootstrap/](bootstrap/main.tf) | State bucket, lock table, GitHub OIDC deploy role (once, local state) |
 | [apps/writer-python](apps/writer-python/writer.py) · [apps/reader-springboot](apps/reader-springboot/src/main/java/com/sefs/reader/SharedDirPoller.java) | The two apps |
 | [sefs](sefs) · [setup.sh](setup.sh) · [Makefile](Makefile) · [scripts/](scripts) | The one command (wrapper + keyword reads from SSM); fresh-clone setup; targets; teardown, orphan adoption, credential-free profiles, CI change mapper |
@@ -192,3 +204,7 @@ Every `.md` here has a plain-text `.txt` twin.
 **The CI role is created by you, not by CI.** The bootstrap stack (local state) owns the state bucket, the lock table and the deploy role, and the role explicitly denies IAM on itself, so a workflow can never widen its own permissions or delete the state it runs on.
 
 **Secrets never pass through Terraform.** `setup.sh` streams them to SSM on stdin as SecureStrings; nothing in state, argv or the repo (proven by `make test-setup`).
+
+**The map scores health on the server, not in the browser.** The API applies the same rules the verifier does (sg-efs admits 2049 from sg-apps only, running ≥ desired, alarm state) and the page only colours what it is told; one place holds the rules. The alternative, a page that reads AWS directly, would need AWS credentials in the browser or a wide role; instead the page holds a Cognito token and the Lambda holds a role that can only read.
+
+**The page is compiled during the apply, from a lock file, in a pinned container.** A bundler would add tooling to pin for one entry point; `tsc` plus an import map to a vendored copy of three.js is enough and keeps the client's browser off any CDN (D27). A pre-built bundle committed to git would be a 700 KB binary-like blob the repo forbids (D24).

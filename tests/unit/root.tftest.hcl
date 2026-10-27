@@ -33,6 +33,22 @@ mock_provider "aws" {
   }
 }
 
+# The map child is proven in gui.tftest.hcl; here it is overridden so no archive/docker step runs.
+override_module {
+  target = module.gui[0]
+  outputs = {
+    url                  = "https://d111111abcdef8.cloudfront.net/"
+    api_url              = "https://ut.execute-api.us-east-1.amazonaws.com"
+    user_pool_id         = "us-east-1_UT000000"
+    user_pool_client_id  = "utclientid"
+    cognito_domain       = "https://sefs-ut.auth.us-east-1.amazoncognito.com"
+    bucket               = "sefs-gui-ut"
+    distribution_id      = "E1UT"
+    lambda_function_name = "sefs-gui-api"
+    api_role_arn         = "arn:aws:iam::111122223333:role/sefs-gui-api-ut"
+  }
+}
+
 override_module {
   target = module.images
   outputs = {

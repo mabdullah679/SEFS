@@ -34,6 +34,22 @@ mock_provider "aws" {
   }
 }
 
+# The map child is proven in tests/unit/gui.tftest.hcl; overridden here so no archive/docker step runs.
+override_module {
+  target = module.gui[0]
+  outputs = {
+    url                  = "https://d111111abcdef8.cloudfront.net/"
+    api_url              = "https://ut.execute-api.us-east-1.amazonaws.com"
+    user_pool_id         = "us-east-1_UT000000"
+    user_pool_client_id  = "utclientid"
+    cognito_domain       = "https://sefs-ut.auth.us-east-1.amazoncognito.com"
+    bucket               = "sefs-gui-ut"
+    distribution_id      = "E1UT"
+    lambda_function_name = "sefs-gui-api"
+    api_role_arn         = "arn:aws:iam::111122223333:role/sefs-gui-api-ut"
+  }
+}
+
 override_module {
   target = module.images
   outputs = {
@@ -56,6 +72,7 @@ run "root_outputs_all_wired" {
       output.backup_vault_name, output.backup_plan_id, output.cluster_name,
       output.writer_service_name, output.reader_service_name,
       output.writer_log_group, output.reader_log_group, output.reader_task_definition_arn,
+      output.gui_url, output.gui_api_url, output.gui_api_role_arn,
     ] : v != null && v != ""])
     error_message = "Every root output must be wired to a real value (a null placeholder survived)."
   }

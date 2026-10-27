@@ -105,7 +105,27 @@ module "registry" {
     reader_log_group       = module.apps.reader_log_group
     alerts_topic_arn       = module.observability.alerts_topic_arn
     dashboard_name         = module.observability.dashboard_name
+    gui_url                = var.enable_gui ? module.gui[0].url : "disabled"
+    gui_api_url            = var.enable_gui ? module.gui[0].api_url : "disabled"
   }
+}
+
+# The 2.5D map (D23 sidewagon, D25 Cognito login). Reads the stack through the registry above and the
+# Project tag; its role can only read (plus one pricing-cache parameter). `enable_gui = false` removes it.
+# Update with `make apply-one CHILD=gui`.
+module "gui" {
+  source = "./modules/gui"
+  count  = var.enable_gui ? 1 : 0
+
+  name              = var.name
+  region            = var.region
+  admin_email       = var.gui_admin_email
+  ssm_prefix        = module.access.ssm_prefix
+  writer_log_group  = module.apps.writer_log_group
+  reader_log_group  = module.apps.reader_log_group
+  backup_vault_name = module.backup.vault_name
+  cluster_name      = module.apps.cluster_name
+  cost_actuals      = var.activate_cost_allocation_tag # real spend needs the Project cost allocation tag active
 }
 
 # Observability: alarms -> SNS, dashboard, log-derived metrics. Update with `make apply-one CHILD=observability`.

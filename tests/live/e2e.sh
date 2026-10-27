@@ -22,6 +22,9 @@
 #   E4 R1     persistence: files written before `terraform destroy -target=module.apps`
 #             are READ again (same sha256) by the fresh reader after re-apply, and
 #             the file system ID + creation time are unchanged.
+#   E5 GUI    the map's API, probed with a throwaway Cognito user (created + deleted
+#             here): overview lists the live stack with nothing "down", the EFS room
+#             proves the reader deny, the cost report has a positive rate, the page loads.
 #
 # Silence is never success: a step that cannot observe its evidence is
 # UNVERIFIED, and any non-PASS makes the exit code non-zero.
@@ -253,8 +256,46 @@ e4() {
   fi
 }
 
-# E2E_ONLY="e3" (space-separated) re-runs a subset; default is all four in order.
-for step in ${E2E_ONLY:-e1 e2 e3 e4}; do case "$step" in e1|e2|e3|e4) "$step" ;; *) echo "unknown step $step" >&2; exit 2 ;; esac; done
+# ======================================================================== E5
+# The map (D32): a throwaway Cognito user is created with the deployer's IAM rights, a token is minted
+# with ADMIN_USER_PASSWORD_AUTH, and the read-only API is probed end to end: the overview must list the
+# live stack with no "down" node, the EFS room must prove the reader deny, the cost report must carry a
+# positive hourly rate, and the page must load. The user is deleted afterwards (trap).
+e5() {
+  OUT="$("$TF" output -json)"
+  local url api pool client user pw tok ov room cost page http n_down n_nodes
+  url="$(o gui_url)"; api="$(o gui_api_url)"; pool="$(o gui_user_pool_id)"
+  if [ -z "$url" ]; then result UNVERIFIED E5 "GUI: not deployed (enable_gui = false)"; return; fi
+  client="$(aws_ cognito-idp list-user-pool-clients --user-pool-id "$pool" --query 'UserPoolClients[0].ClientId' --output text)"
+  user="e2e-probe-$(date +%s)@example.invalid"
+  pw="E2e-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 14)!x"
+  trap 'aws_ cognito-idp admin-delete-user --user-pool-id "$pool" --username "$user" >/dev/null 2>&1 || true' RETURN
+  aws_ cognito-idp admin-create-user --user-pool-id "$pool" --username "$user" --message-action SUPPRESS \
+    --user-attributes Name=email,Value="$user" Name=email_verified,Value=true >/dev/null
+  aws_ cognito-idp admin-set-user-password --user-pool-id "$pool" --username "$user" --password "$pw" --permanent
+  tok="$(aws_ cognito-idp admin-initiate-auth --user-pool-id "$pool" --client-id "$client" --auth-flow ADMIN_USER_PASSWORD_AUTH \
+    --auth-parameters "USERNAME=$user,PASSWORD=$pw" --query 'AuthenticationResult.IdToken' --output text)"
+  unset pw
+  if [ -z "$tok" ] || [ "$tok" = "None" ]; then result UNVERIFIED E5 "GUI: could not mint a token for the probe user"; return; fi
+  ov="$(curl -sS --max-time 40 -H "authorization: Bearer $tok" "$api/api/overview")" || { result UNVERIFIED E5 "GUI: /api/overview unreachable"; return; }
+  n_nodes="$(jq -r '.nodes | length' <<<"$ov" 2>/dev/null || echo 0)"
+  n_down="$(jq -r '[.nodes[] | select(.health=="down")] | length' <<<"$ov" 2>/dev/null || echo "?")"
+  room="$(curl -sS --max-time 40 -H "authorization: Bearer $tok" "$api/api/room/efs")"
+  cost="$(curl -sS --max-time 60 -H "authorization: Bearer $tok" "$api/api/cost")"
+  http="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url")"
+  page="$(curl -sS --max-time 20 "$url")"
+  if [ "$(jq -r '.deployed' <<<"$ov")" != "true" ] || [ "$n_nodes" -lt 10 ]; then
+    result FAIL E5 "GUI: overview did not describe the stack (deployed=$(jq -r .deployed <<<"$ov"), nodes=$n_nodes): $(jq -c '.error // empty' <<<"$ov")"; return; fi
+  if [ "$n_down" != "0" ]; then
+    result FAIL E5 "GUI: $n_down node(s) scored down: $(jq -c '[.nodes[] | select(.health=="down") | {id, reason}]' <<<"$ov")"; return; fi
+  if [ "$(jq -r '.readerWriteDenied' <<<"$room")" != "true" ]; then result FAIL E5 "GUI: EFS room does not show the reader deny: $(jq -c . <<<"$room" | head -c 300)"; return; fi
+  if ! jq -e '.rates.perHour > 0 and .live.natGateways >= 1' <<<"$cost" >/dev/null 2>&1; then result FAIL E5 "GUI: cost report invalid: $(jq -c '{error, rates: .rates.perHour, live}' <<<"$cost" 2>/dev/null | head -c 300)"; return; fi
+  if [ "$http" != "200" ] || ! grep -q 'js/main.js' <<<"$page"; then result FAIL E5 "GUI: page HTTP $http or missing js/main.js"; return; fi
+  result PASS E5 "GUI: overview $n_nodes nodes, 0 down; EFS room proves the reader deny; cost US\$$(jq -r '.rates.perHour' <<<"$cost")/h ($(jq -r '.live.natGateways' <<<"$cost") NAT); actuals: $(jq -r 'if .actuals==null then "off" elif .actuals.error then "unavailable: "+.actuals.error[0:60] else "US$"+(.actuals.totalUsd|tostring)+" / 30 d" end' <<<"$cost"); page 200"
+}
+
+# E2E_ONLY="e3" (space-separated) re-runs a subset; default is all five in order.
+for step in ${E2E_ONLY:-e1 e2 e3 e4 e5}; do case "$step" in e1|e2|e3|e4|e5) "$step" ;; *) echo "unknown step $step" >&2; exit 2 ;; esac; done
 
 echo
 echo "== e2e summary =="

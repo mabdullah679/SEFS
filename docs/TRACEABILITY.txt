@@ -17,6 +17,7 @@ R13 Encryption key (AWS's own or yours): tested with your own key. The "AWS's ow
 R14 Backups kept 35+ days: a setting that rejects less, fake-AWS tests, 2 break tests, live check.
 R15 Cheaper storage after 30 days: fake-AWS tests, 2 break tests, live check.
 Extra: EFS's built-in automatic backups stay off. Fake-AWS test, 1 break test, live check.
+Extra: the 2.5D map (added 2026-10-27): login required on every API call, the map's own permissions are read-only, the page storage is private and HTTPS-only. Six fake-AWS tests, 7 break tests, 18 tests of the map's data service against a fake AWS that refuses any writing call, a live check (page loads, anonymous API call refused, login pool admin-only, permissions read-only), and a live behaviour test that signs in as a throwaway user, reads the whole stack through the map, checks the reader's write block is shown, and deletes the user again.
 Extra: code matches what's running: live only, Terraform must report no changes.
 
 GAPS, PLAINLY

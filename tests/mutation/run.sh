@@ -106,6 +106,13 @@ m45 ::: OBS ::: modules/observability/main.tf ::: sub ::: treat_missing_data  = 
 m46 ::: OBS ::: modules/observability/main.tf ::: sub ::: pattern        = "\"WRITE_PROBE ALLOWED\"" ::: pattern        = "\"WRITE_PROBE DENIED\"" ::: tests/unit/observability.tftest.hcl::reader_write_allowed_is_a_security_alarm
 m47 ::: OBS ::: modules/observability/main.tf ::: sub@3 ::: alarm_actions       = [aws_sns_topic.alerts.arn] ::: alarm_actions       = [] ::: tests/unit/observability.tftest.hcl::every_alarm_notifies_the_alerts_topic
 m48 ::: OBS ::: modules/observability/main.tf ::: sub ::: for_each = var.nat_gateways_by_az # keys = AZ names (known at plan); NAT IDs are not ::: for_each = { for k, v in var.nat_gateways_by_az : k => v if k == sort(keys(var.nat_gateways_by_az))[0] } ::: tests/unit/observability.tftest.hcl::efs_and_backup_alarms_shape
+g01 ::: GUI ::: modules/gui/main.tf ::: sub ::: authorization_type = "JWT" ::: authorization_type = "NONE" ::: tests/unit/gui.tftest.hcl::login_required_on_every_api_route
+g02 ::: GUI ::: modules/gui/main.tf ::: sub ::: allow_admin_create_user_only = true # nobody can sign themselves up ::: allow_admin_create_user_only = false # nobody can sign themselves up ::: tests/unit/gui.tftest.hcl::nobody_can_sign_themselves_up
+g03 ::: GUI ::: modules/gui/main.tf ::: sub ::: block_public_policy     = true ::: block_public_policy     = false ::: tests/unit/gui.tftest.hcl::page_is_private_and_https_only
+g04 ::: GUI ::: modules/gui/main.tf ::: sub ::: Action   = ["ssm:PutParameter"] ::: Action   = ["ssm:PutParameter", "ssm:DeleteParameter"] ::: tests/unit/gui.tftest.hcl::api_role_can_only_read
+g05 ::: GUI ::: modules/gui/main.tf ::: sub ::: Resource = ["${local.cache_param_arn}/*"] ::: Resource = ["${local.outputs_param}/*"] ::: tests/unit/gui.tftest.hcl::api_role_can_only_read
+g06 ::: GUI ::: modules/gui/main.tf ::: sub@1 ::: viewer_protocol_policy     = "redirect-to-https" ::: viewer_protocol_policy     = "allow-all" ::: tests/unit/gui.tftest.hcl::page_is_private_and_https_only
+g07 ::: GUI ::: modules/gui/main.tf ::: sub ::: allow_methods = ["GET", "OPTIONS"] ::: allow_methods = ["GET", "POST", "OPTIONS"] ::: tests/unit/gui.tftest.hcl::page_is_private_and_https_only
 EOF
 
 # Apply one mutation in place to $1 (a temp copy). Prints nothing on success.

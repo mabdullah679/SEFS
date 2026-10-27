@@ -14,6 +14,7 @@ To update **one** component, apply only its child: `make apply-one CHILD=<child>
 | Alarms, SNS alerts topic, dashboard, log metric filters, cost allocation tag (opt-in) | `observability` | [modules/observability](../modules/observability) | `alert_email` subscribes an address (confirm the SNS email once) |
 | Bruno read-only role | `access` | [modules/access](../modules/access) | |
 | Deployed IDs in SSM `/sefs/outputs/*` | `registry` | [modules/registry](../modules/registry) | Non-secret only |
+| The 2.5D map: Cognito login, CloudFront + S3 page, read-only Lambda API behind an HTTP API | `gui` | [modules/gui](../modules/gui) | Optional (`enable_gui`, default on). Page sources in `modules/gui/web`, API in `modules/gui/api`; the page is compiled inside the apply by `modules/gui/build.sh` (Docker). Idle cost ≈ 0 |
 
 ## Mother vs. granular
 - **Whole deployment / larger scale:** use the mother. One state, one apply, one plan that shows every change across children.

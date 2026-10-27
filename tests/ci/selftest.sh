@@ -23,4 +23,6 @@ case_ "docs/tests/bruno -> none"     "none"                docs/X.md tests/unit/
 case_ "unknown path -> full"         "full"                mystery/thing.yaml
 case_ "unknown module dir -> full"   "full"                modules/newthing/main.tf
 case_ "module + docs -> module only" "security"            modules/security/main.tf docs/Y.md
+case_ "map page or API -> gui"       "gui"                 modules/gui/web/src/main.ts modules/gui/api/app.py
+case_ "gui after registry"           "registry gui"        modules/gui/main.tf modules/registry/main.tf
 [ $fail = 0 ] && echo "ci selftest: ALL PASS" || { echo "ci selftest: FAIL"; exit 1; }

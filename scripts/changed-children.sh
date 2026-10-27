@@ -9,14 +9,14 @@
 #   <child> [<child>…]   space-separated module names, in dependency order
 #
 # Rules (docs/COMPONENTS.md is the human version of this table):
-#   modules/<x>/**            -> x
+#   modules/<x>/**            -> x   (modules/gui/web and modules/gui/api are part of gui: the apply rebuilds them)
 #   apps/**                   -> images apps   (a new image tag flows into the task definitions)
 #   main.tf variables.tf outputs.tf versions.tf *.tfvars  -> full
 #   docs tests bruno scripts Makefile setup.sh README* PLAN* .github .gitignore secrets.manifest -> none
 #   anything else             -> full  (fail safe: unknown means "redeploy everything")
 set -euo pipefail
 base="${1:?base ref}"; head="${2:?head ref}"
-ORDER=(network security efs backup images apps observability access registry)
+ORDER=(network security efs backup images apps observability access registry gui)
 
 full=0; want=" "   # portable to bash 3.2 (macOS): no associative arrays
 while IFS= read -r f; do

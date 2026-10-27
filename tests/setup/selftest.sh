@@ -60,6 +60,7 @@ run_full() { # answers every prompt; output to $1
     expect \"THIS account\" { send \"y\r\" }
     expect \"Region\"       { send \"\r\" }
     expect \"Email for alarm\" { send \"ops@example.com\r\" }
+    expect \"map login\"    { send \"\r\" }
     expect \"GitHub repo\"    { send \"\r\" }
     expect \"api_key\"      { send \"$SECRET\r\" }
     expect eof
@@ -73,8 +74,8 @@ if [ -f "$FAKE_LOG.put-stdin" ] && jq -e --arg v "$SECRET" '.Value==$v and .Type
   pass "S2 put-parameter got the value on stdin as SecureString under /sefs/secrets/"
 else bad "S2 put-parameter stdin wrong or missing: $(cat "$FAKE_LOG.put-stdin" 2>/dev/null | jq -c 'del(.Value)' 2>/dev/null)"; fi
 changed="$(git -C "$W/repo" status --porcelain --ignored | grep -v '^!! .terraform' | awk '{print $2}' | sort | tr '\n' ' ')"
-if [ "$changed" = "account.auto.tfvars " ] && grep -q 'allowed_account_id = "111122223333"' "$W/repo/account.auto.tfvars" && grep -q 'region             = "eu-west-1"' "$W/repo/account.auto.tfvars" && grep -q 'alert_email        = "ops@example.com"' "$W/repo/account.auto.tfvars"; then
-  pass "S3 only account.auto.tfvars written, with the confirmed account + region"
+if [ "$changed" = "account.auto.tfvars " ] && grep -q 'allowed_account_id = "111122223333"' "$W/repo/account.auto.tfvars" && grep -q 'region             = "eu-west-1"' "$W/repo/account.auto.tfvars" && grep -q 'alert_email        = "ops@example.com"' "$W/repo/account.auto.tfvars" && grep -q 'gui_admin_email    = "ops@example.com"' "$W/repo/account.auto.tfvars"; then
+  pass "S3 only account.auto.tfvars written, with the confirmed account + region (map login defaults to the alarm e-mail)"
 else bad "S3 unexpected files or content: [$changed]"; fi
 if grep -rq "$SECRET" "$W/repo"; then bad "S4 secret found on disk in the repo copy"; else pass "S4 secret in no repo file"; fi
 
@@ -92,9 +93,9 @@ rm -f "$FAKE_LOG".*
   expect \"api_key\" { send \"$SECRET\r\" }
   expect eof
 " ) >"$W/out3" 2>&1 || true
-if [ "$(cached "$W/out3")" = 4 ] && [ -f "$FAKE_LOG.put-stdin" ] && grep -q 'alert_email        = "ops@example.com"' "$W/repo/account.auto.tfvars"; then
-  pass "S6 second run in the session: 4 answers replayed from the cache, only the secret typed"
-else bad "S6 expected 4 cached answers and a stored secret; got $(cached "$W/out3") cached, put-stdin $([ -f "$FAKE_LOG.put-stdin" ] && echo present || echo missing)"; fi
+if [ "$(cached "$W/out3")" = 5 ] && [ -f "$FAKE_LOG.put-stdin" ] && grep -q 'alert_email        = "ops@example.com"' "$W/repo/account.auto.tfvars"; then
+  pass "S6 second run in the session: 5 answers replayed from the cache, only the secret typed"
+else bad "S6 expected 5 cached answers and a stored secret; got $(cached "$W/out3") cached, put-stdin $([ -f "$FAKE_LOG.put-stdin" ] && echo present || echo missing)"; fi
 
 # ---- S7 another boot id: the whole cache is discarded and everything is asked again
 sed -i.bak '1s/.*/boot	1/' "$SEFS_INPUT_CACHE" && rm -f "$SEFS_INPUT_CACHE.bak"

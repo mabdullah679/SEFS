@@ -1,0 +1,17 @@
+{
+  "name": "sefs-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "2.5D map of the live SEFS stack (three.js, TypeScript). Built inside the Terraform apply; see modules/gui/build.sh.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/three": "0.170.0",
+    "typescript": "5.6.3"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

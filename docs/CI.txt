@@ -33,3 +33,6 @@ HONEST LIMITS
 - GitHub's machines are not ARM, so app images build under emulation and from scratch each time, which is slower.
 
 - Found and fixed 2026-10-26: when the deploy step was put behind a human approval (the GitHub "environment"), GitHub started identifying the run differently and AWS refused it. The deploy role now trusts both identities, each spelled out exactly. Also, "check" used to match inside words like "checks", which started two unintended (but still approval-gated) deploys; it now has to be the word on its own.
+
+THE MAP IN CI (2026-10-27)
+A change under modules/gui redeploys only the map. Its web page is compiled on the GitHub runner inside a pinned Node container, and only when a page file changed.

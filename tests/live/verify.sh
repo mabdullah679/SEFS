@@ -318,6 +318,24 @@ else
 fi
 report OBS "alarms wired to SNS, Container Insights on, dashboard present"
 
+# ---------------------------------------------------------------- GUI (the map, D32; skipped when enable_gui = false)
+GUI_URL="$(o gui_url)"; GUI_API="$(o gui_api_url)"; GUI_POOL="$(o gui_user_pool_id)"; GUI_ROLE="$(o gui_api_role_arn)"
+if [ -n "$GUI_URL" ]; then
+  begin
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$GUI_URL" 2>>"$ERRLOG" || echo 000)"
+  [ "$code" = "200" ] && ok || bad "page $GUI_URL answered HTTP $code (want 200)"
+  http="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "${GUI_URL%/}/config.json" 2>>"$ERRLOG" || echo 000)"
+  [ "$http" = "200" ] && ok || bad "config.json answered HTTP $http"
+  noauth="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$GUI_API/api/overview" 2>>"$ERRLOG" || echo 000)"
+  [ "$noauth" = "401" ] && ok || bad "API without a token answered HTTP $noauth (want 401: login is the control)"
+  fetch POOL cognito-idp describe-user-pool --user-pool-id "$GUI_POOL"
+  check "self sign-up disabled on the pool" '.UserPool.AdminCreateUserConfig.AllowAdminCreateUserOnly == true' "$POOL"
+  role_name="${GUI_ROLE##*/}"
+  fetch POL iam get-role-policy --role-name "$role_name" --policy-name read-only-map
+  check "API role holds no write beyond its cache parameter" '[.PolicyDocument.Statement[] | (.Action | if type=="array" then . else [.] end)[] | select(test("^(tag:GetResources|logs:(CreateLogStream|PutLogEvents|FilterLogEvents|DescribeLogStreams|GetLogEvents)|ssm:(GetParameter|GetParameters|GetParametersByPath|PutParameter)|ce:GetCostAndUsage|pricing:GetProducts|[a-z0-9]+:(Describe|List|Get)[A-Za-z]+)$") | not)] | length == 0' "$POL"
+  report GUI "map page served over HTTPS, API refuses anonymous calls, pool admin-only, API role read-only"
+fi
+
 # ---------------------------------------------------------------- drift
 begin
 set +e

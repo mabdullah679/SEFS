@@ -83,6 +83,13 @@ check "log groups"      "aws logs describe-log-groups --region $region --log-gro
 check "backup vaults"   "aws backup list-backup-vaults --region $region --query \"BackupVaultList[?starts_with(BackupVaultName,'$name')].BackupVaultName\" --output text"
 check "backup plans"    "aws backup list-backup-plans --region $region --query \"BackupPlansList[?starts_with(BackupPlanName,'$name')].BackupPlanName\" --output text"
 check "IAM roles"       "aws iam list-roles --query \"Roles[?starts_with(RoleName,'$name-') && RoleName!='$name-github-deploy'].RoleName\" --output text"
+# The map (modules/gui): login pool, page bucket + distribution, API + its function and log group.
+check "Cognito pools"   "aws cognito-idp list-user-pools --region $region --max-results 60 --query \"UserPools[?Name=='$name-gui'].Id\" --output text"
+check "page buckets"    "aws s3api list-buckets --query \"Buckets[?starts_with(Name,'$name-gui-')].Name\" --output text"
+check "CloudFront"      "aws cloudfront list-distributions --query \"DistributionList.Items[?Comment=='$name 2.5D map'].Id\" --output text"
+check "HTTP APIs"       "aws apigatewayv2 get-apis --region $region --query \"Items[?Name=='$name-gui-api'].ApiId\" --output text"
+check "Lambda"          "aws lambda list-functions --region $region --query \"Functions[?FunctionName=='$name-gui-api'].FunctionName\" --output text"
+check "Lambda logs"     "aws logs describe-log-groups --region $region --log-group-name-prefix /aws/lambda/$name-gui-api --query 'logGroups[].logGroupName' --output text"
 
 # Advisory only: the tagging API keeps deleted resources listed for a while.
 lag=$(aws resourcegroupstaggingapi get-resources --region "$region" \

@@ -41,6 +41,7 @@ Read the live stack (read-only; works with any AWS login that can read SSM/ECS/E
   ./sefs logs writer|reader [N] last N lines (default 20) of the app's newest log stream
   ./sefs alarms                every alarm and its state
   ./sefs url                   console links (dashboard, cluster, file system)
+  ./sefs map                   the 2.5D map's address and how to sign in (Cognito user from setup)
 EOF
 }
 
@@ -137,6 +138,15 @@ cmd_logs() {
   aws logs get-log-events --log-group-name "$group" --log-stream-name "$stream" --limit "$n" --query 'events[].message' --output text | tr '\t' '\n'
 }
 
+cmd_map() {
+  need aws; deployed_or_die
+  local url; url=$(reg gui_url)
+  [ -n "$url" ] && [ "$url" != "disabled" ] || die "the map is not deployed (enable_gui = false or an older stack); './sefs up' with enable_gui = true"
+  echo "map:     $url"
+  echo "api:     $(reg gui_api_url)   (GET /api/overview | /api/room/{efs,ecs,vpc,backup} | /api/cost | /api/logs, Cognito JWT required)"
+  echo "sign in with the user Cognito e-mailed (gui_admin_email in account.auto.tfvars); first login sets a new password"
+}
+
 cmd_url() {
   need aws; deployed_or_die
   local c="https://$REGION.console.aws.amazon.com"
@@ -161,5 +171,6 @@ case "$cmd" in
   alarms)         cmd_alarms ;;
   logs)           cmd_logs "$@" ;;
   url)            cmd_url ;;
+  map)            cmd_map ;;
   *)              usage >&2; die "unknown command: $cmd" ;;
 esac

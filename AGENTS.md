@@ -44,6 +44,7 @@ One root ("mother", [main.tf](main.tf)) calls child modules; **one state** (S3).
 | `observability` | SNS alerts, 10 alarms, log metric filters, dashboard, opt-in cost tag | NAT alarms keyed by AZ; `WRITE_PROBE ALLOWED` in reader logs alarms within 1 min |
 | `access` | `sefs-bruno-reader` role | read-only, SSM scoped to `/sefs/*`, KMS decrypt only via SSM |
 | `registry` | SSM `/sefs/outputs/*` | non-secret deployed IDs; secrets go under `/sefs/secrets/*` and are written only by `setup.sh` |
+| `gui` (optional, `enable_gui`) | Cognito pool + hosted login, S3 page behind CloudFront, HTTP API (JWT) → ARM Lambda `api/app.py`, `web/` TypeScript + three.js compiled by `build.sh` in the apply | D32. The API role reads only (plus its pricing cache parameter); health is scored server-side; `./sefs map` prints the address. Idle cost ≈ 0 |
 | `bootstrap/` (separate root, local state) | state bucket, lock table, GitHub OIDC role | run once per account+region; never managed by CI |
 
 Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md). Variables with defaults: [variables.tf](variables.tf). Outputs: [outputs.tf](outputs.tf).
@@ -53,13 +54,13 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 | Goal | Command | Notes |
 |---|---|---|
 | Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying; step 3c sets the five GitHub Actions variables through `gh` when signed in. Prompt answers are cached 24 h from entry, per boot session (`~/.cache/sefs/inputs.tsv`, keyed by kernel boot time; never secrets); `./sefs forget` clears, `SEFS_NO_CACHE=1` bypasses |
-| Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` · `./sefs burn` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed. `burn` = hours up (EFS creation time) × US$0.174/h (`SEFS_RATE_PER_HOUR`) |
+| Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` · `./sefs burn` · `./sefs map` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed. `burn` = hours up (EFS creation time) × US$0.174/h (`SEFS_RATE_PER_HOUR`) |
 | Deploy / redeploy | `make up` or `./sefs up` (`AUTO=1` skips the prompt) | preflight refuses the wrong account, a missing `backend.hcl`, or an `aws login` session profile (see §7) |
 | One child | `make apply-one CHILD=efs` | |
 | Live checks | `make verify` | every R-ID against AWS + `terraform plan` must be clean |
 | Live behaviour | `E2E_CONFIRM=yes make e2e` (`E2E_ONLY="e3"` for a subset) | write/read, IAM read-only proof, destroy-apps-and-recover |
 | Bruno collection | `make bruno-profile SOURCE=<login profile>` once, then `make bruno` | signs with a credential-free profile that assumes `sefs-bruno-reader`; hydrates IDs from SSM |
-| All local proofs (no AWS) | `make test` | unit (mocked), mutation, Docker contract, setup self-test |
+| All local proofs (no AWS) | `make test` | unit (mocked), mutation, Docker contract, setup self-test, map API (fake boto3), map page build (Docker) |
 | Tear down | `CONFIRM_DESTROY_DATA=yes make down` | deletes the EFS and its data; keeps state bucket unless `DESTROY_STATE=yes`; sweeps the account per service |
 | CI | push to `main` with `check` in the message | [docs/CI.md](docs/CI.md); first deploy on empty state is always full |
 

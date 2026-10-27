@@ -109,7 +109,10 @@ class StackCost:
                 "Not metered here (free at this scale or one-off): VPC, security groups, ECS cluster, IAM, EFS mount targets/access points,",
                 "SNS (first 1k notifications), dashboard (first 3), log metric filters, SSM standard parameters, S3 state bucket and",
                 "DynamoDB lock table (cents), NAT data processing (depends on traffic; image pulls ~0.5 GB per fresh deploy),",
-                "GitHub Actions minutes (free for public repos). The daily backup job itself is free; only its storage is metered."]
+                "GitHub Actions minutes (free for public repos). The daily backup job itself is free; only its storage is metered.",
+                "The 2.5D map (modules/gui) adds nothing while idle: Cognito (first 10k users free), CloudFront + S3 page (first 1 TB and",
+                "10M requests free, a few MB stored), HTTP API + Lambda ARM (first 1M requests / 400k GB-s free; one call per refresh),",
+                "Cost Explorer API US$0.01 per call while cost_actuals is on (one per cost-panel load)."]
         return "\n".join(out)
 
 

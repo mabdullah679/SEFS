@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SEFS map</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Pinned copies of three.js are uploaded next to this page by modules/gui/build.sh (D27: no CDN). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.min.js",
+      "three/addons/": "./vendor/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header id="bar">
+    <div id="title">SEFS <span id="project"></span> <span id="overall" class="pill unknown">…</span></div>
+    <div id="meta">
+      <span id="generated"></span>
+      <button id="refresh" title="read everything again now">refresh</button>
+      <button id="logout" hidden>sign out</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <div id="gl"></div>
+    <div id="labels"></div>
+    <div id="tooltip" hidden></div>
+    <div id="gate" hidden>
+      <div class="card">
+        <h1>SEFS map</h1>
+        <p>A live 2.5D view of the stack tagged <code id="gate-project"></code>. Sign in with the user you were e-mailed.</p>
+        <button id="login">sign in</button>
+        <p id="gate-error" class="error" hidden></p>
+      </div>
+    </div>
+  </main>
+
+  <aside id="side">
+    <section id="cost">
+      <h2>cost</h2>
+      <div id="cost-body" class="muted">loading…</div>
+    </section>
+    <section id="alarms">
+      <h2>alarms</h2>
+      <ul id="alarm-list"></ul>
+    </section>
+    <section id="logs">
+      <h2>logs <button data-app="writer" class="tab active">writer</button><button data-app="reader" class="tab">reader</button></h2>
+      <pre id="log-body" class="muted">loading…</pre>
+    </section>
+  </aside>
+
+  <div id="room" hidden>
+    <div id="room-head"><h2 id="room-title"></h2><button id="room-close">back to the map</button></div>
+    <div id="room-gl"></div>
+    <div id="room-labels"></div>
+    <div id="room-facts"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
