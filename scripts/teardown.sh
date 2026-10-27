@@ -68,6 +68,11 @@ for fam in "$name-writer" "$name-reader" "$name-reader-iam-mutation"; do
   fi
 done
 
+# Container Insights creates its own log group outside Terraform when the cluster is created; it outlives
+# the cluster (observed after the 2026-10-28 teardown) and is deleted here.
+aws logs delete-log-group --region "$region" --log-group-name "/aws/ecs/containerinsights/$name/performance" >/dev/null 2>&1 \
+  && echo "Deleted the Container Insights log group" || true
+
 # Authoritative check: ask each service directly. A check that can't run counts as NOT clean.
 echo "--- Direct checks (Project=$name, $region) ---"
 fail=0
@@ -93,6 +98,7 @@ for fam in "$name-writer" "$name-reader" "$name-reader-iam-mutation"; do
   check "inactive task defs $fam" "aws ecs list-task-definitions --region $region --family-prefix $fam --status INACTIVE --query 'taskDefinitionArns' --output text"
 done
 check "log groups"      "aws logs describe-log-groups --region $region --log-group-name-prefix /ecs/$name/ --query 'logGroups[].logGroupName' --output text"
+check "insights logs"    "aws logs describe-log-groups --region $region --log-group-name-prefix /aws/ecs/containerinsights/$name/ --query 'logGroups[].logGroupName' --output text"
 check "backup vaults"   "aws backup list-backup-vaults --region $region --query \"BackupVaultList[?starts_with(BackupVaultName,'$name')].BackupVaultName\" --output text"
 check "backup plans"    "aws backup list-backup-plans --region $region --query \"BackupPlansList[?starts_with(BackupPlanName,'$name')].BackupPlanName\" --output text"
 check "IAM roles"       "aws iam list-roles --query \"Roles[?starts_with(RoleName,'$name-') && RoleName!='$name-github-deploy'].RoleName\" --output text"

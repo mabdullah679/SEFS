@@ -75,8 +75,9 @@ Account guard: `allowed_account_id` in `account.auto.tfvars` is enforced by the 
 | Docker contract (writer/reader as real UIDs) | `tests/contract/` | 16/16 |
 | setup.sh secret safety + input cache (fake `aws`) | `tests/setup/selftest.sh` | 9/9 (2026-10-27); mutation-proven (secret paths earlier; cache: boot check, 24 h expiry, cache off, secret via cache → 4/4 killed) |
 | CI change mapper | `tests/ci/selftest.sh` | 9/9; mutation-proven |
-| Live verify | `tests/live/verify.sh` | 16/16 + zero drift (2026-10-25, ap-southeast-2, run from GitHub Actions) |
-| Live e2e | `tests/live/e2e.sh` | E1–E4 pass (2026-10-25) |
+| Live verify | `tests/live/verify.sh` | 17/17 incl. GUI + zero drift (2026-10-27/28, deploys 1 and 2, from CI; from the laptop 17/17 on deploy 1 and 16/17 on deploy 2, the DRIFT line being the CI-created map user absent from the laptop's tfvars: a deployer-input mismatch, not a stack defect) |
+| Live e2e | `tests/live/e2e.sh` | E1–E5 pass on deploy 1 and again on deploy 2 (2026-10-28): 362 / 61 files, EROFS twice, 361 / 70 survived destroy/re-apply, map probe 30 nodes / 0 down |
+| Map in a browser | headless Chrome over CDP (`scratchpad`, not in the repo) | 2026-10-28: Cognito login round-trip, overview rendered all-ok, tooltip, EFS room; found the `hidden` overlay bug |
 | Bruno collection live | `bruno/sefs` | **not yet run live** (see PLAN.md §7) |
 | GitHub Actions "check" | `.github/workflows/check.yml` | **Live-proven 2026-10-25** (run 40216156247): full apply from GitHub, zero drift, verify 16/16 incl. OBS; deploy job 1 m 47 s |
 
@@ -100,6 +101,7 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 - GitHub's OIDC `sub` claim now includes numeric IDs (`repo:owner@id/repo@id:ref:…`) → the deploy role trusts that exact string.
 - The image-push watchdog once held Terraform's stdout pipe (orphaned `sleep`) → a 1-minute push "took" 40 minutes; watchdog fds are now detached.
 - A cancelled apply left ECS services in AWS but not in state → `scripts/adopt-orphans.sh` runs before every apply.
+- The map's page-build container ran as root on the GitHub runner, so the apply's cleanup `rm -rf` failed after a successful upload (CI, 2026-10-28) → `build.sh` runs the container as the invoking user and the cleanup can never fail the apply. Docker Desktop on macOS hid this by mapping ownership.
 - Terraform through the `sefs-tf` helper profile stalled for minutes and then failed with "credential process timed out: signal: killed" (2026-10-27): the `aws login` session token lives ~15 min and its refresh took 73 s on a slow link, longer than the SDK's 60 s limit for a `credential_process`. The CLI itself was never slow. Workaround while a long Terraform op runs: keep the token fresh from another shell (`while true; do aws sts get-caller-identity --profile <login profile> >/dev/null; sleep 240; done`), so the helper answers from cache. A killed `terraform console` also left a stale state lock (`terraform force-unlock <id>` clears it).
 - A fixed task-role name would be locked out of the EFS if the role were ever recreated → `name_prefix`.
 
