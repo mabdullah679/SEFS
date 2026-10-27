@@ -28,7 +28,43 @@ RED=$'\033[31m'; GRN=$'\033[32m'; YEL=$'\033[33m'; RST=$'\033[0m'
 ok()   { echo "${GRN}ok${RST}    $*"; }
 warn() { echo "${YEL}warn${RST}  $*"; }
 die()  { echo "${RED}FAIL${RST}  $*" >&2; exit 1; }
-ask()  { local r; read -r -p "$1 " r </dev/tty; printf '%s' "$r"; }
+
+# ---------- input cache (owner, 2026-10-27): every answer typed at a prompt is kept for 24 h from
+# the moment it was entered, for this boot session only. The file carries the kernel boot time; a
+# restart, reboot or shutdown changes it and the whole cache is discarded. Secrets never go through
+# ask(): they are read by the silent prompt in step 4 and are never written here.
+#   SEFS_NO_CACHE=1 ./sefs setup   ignore and do not write the cache     ./sefs forget   delete it
+CACHE="${SEFS_INPUT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/sefs/inputs.tsv}"
+CACHE_TTL=86400
+boot_id() {
+  if [ -r /proc/stat ]; then awk '/^btime/{print $2}' /proc/stat
+  else sysctl -n kern.boottime 2>/dev/null | sed -nE 's/.*sec = ([0-9]+).*/\1/p'; fi
+}
+BOOT="$(boot_id)"; BOOT="${BOOT:-unknown}"
+cache_get() { # key -> value on stdout; exit 1 when missing, older than 24 h, or from another boot
+  [ -z "${SEFS_NO_CACHE:-}" ] && [ -f "$CACHE" ] || return 1
+  awk -F'\t' -v k="$1" -v boot="$BOOT" -v now="$(date +%s)" -v ttl="$CACHE_TTL" '
+    NR==1 { if ($1!="boot" || $2!=boot) exit 1; next }
+    $1==k && (now-$2) < ttl { print $3; found=1; exit }
+    END { exit found?0:1 }' "$CACHE"
+}
+cache_put() { # key value: rewrite the file atomically, keeping only entries from this boot
+  [ -z "${SEFS_NO_CACHE:-}" ] || return 0
+  local dir tmp; dir="$(dirname "$CACHE")"; mkdir -p "$dir"; chmod 700 "$dir"
+  tmp="$(mktemp "$CACHE.XXXXXX")"
+  { printf 'boot\t%s\n' "$BOOT"
+    [ -f "$CACHE" ] && awk -F'\t' -v k="$1" -v boot="$BOOT" 'NR==1{ if ($1!="boot"||$2!=boot) exit; next } $1!=k' "$CACHE"
+    printf '%s\t%s\t%s\n' "$1" "$(date +%s)" "$2"; } > "$tmp"
+  chmod 600 "$tmp"; mv "$tmp" "$CACHE"
+}
+ask() { # ask <cache-key> <prompt>: prints the answer; a cached answer is shown, not asked again
+  local key="$1" prompt="$2" r
+  if r="$(cache_get "$key")"; then
+    echo "      $prompt ${r:-<blank>}   (cached answer from this session; './sefs forget' clears)" >&2
+    printf '%s' "$r"; return 0
+  fi
+  read -r -p "$prompt " r </dev/tty; cache_put "$key" "$r"; printf '%s' "$r"
+}
 
 echo "== 1/6 host tools"
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 is not installed. $2"; }
@@ -56,8 +92,8 @@ acct="$(jq -r .Account <<<"$ident")"; arn="$(jq -r .Arn <<<"$ident")"
 region_default="$(aws configure get region 2>/dev/null || true)"; region_default="${region_default:-us-east-1}"
 echo "      account: $acct"
 echo "      identity: $arn"
-[ "$(ask "Deploy into THIS account? [y/N]")" = "y" ] || die "Aborted. Sign in to the right account and re-run."
-region="$(ask "Region [$region_default]:")"; region="${region:-$region_default}"
+[ "$(ask "confirm_account:$acct" "Deploy into THIS account? [y/N]")" = "y" ] || die "Aborted. Sign in to the right account and re-run."
+region="$(ask region "Region [$region_default]:")"; region="${region:-$region_default}"
 azs="$(aws ec2 describe-availability-zones --region "$region" --query 'length(AvailabilityZones)' --output text 2>/dev/null)" || die "Region '$region' is not usable with these credentials"
 [ "$azs" -ge 2 ] || die "Region $region has $azs AZs; the design needs at least 2"
 ok "$region has $azs AZs"
@@ -73,7 +109,7 @@ echo "== 3/6 local config (git-ignored)"
 if [ -f account.auto.tfvars ] && ! grep -q "\"$acct\"" account.auto.tfvars; then
   warn "account.auto.tfvars points at a different account; replacing it"
 fi
-alert_email="$(ask "Email for alarm notifications (blank = none; you confirm the SNS subscription mail once):")"
+alert_email="$(ask alert_email "Email for alarm notifications (blank = none; you confirm the SNS subscription mail once):")"
 umask 077
 {
   printf 'allowed_account_id = "%s"\nregion             = "%s"\n' "$acct" "$region"
@@ -83,7 +119,7 @@ git check-ignore -q account.auto.tfvars || die "account.auto.tfvars is NOT git-i
 ok "account.auto.tfvars written (allowed_account_id=$acct, region=$region)"
 
 echo "== 3b/6 shared Terraform state (S3 bucket + lock table, once per account+region)"
-gh_repo="$(ask "GitHub repo for CI deploys as owner/repo (blank = no CI role):")"
+gh_repo="$(ask gh_repo "GitHub repo for CI deploys as owner/repo (blank = no CI role):")"
 if [ -n "$gh_repo" ]; then make bootstrap AUTO=1 GITHUB_REPO="$gh_repo"; else make bootstrap AUTO=1; fi
 ok "state backend ready: $(sed -nE 's/^bucket *= *"([^"]+)".*/\1/p' backend.hcl)"
 
@@ -94,7 +130,7 @@ if [ -n "$gh_repo" ] && [ -f backend.hcl ]; then
   ci_role="$(terraform -chdir=bootstrap output -raw github_deploy_role_arn 2>/dev/null || true)"
   printf '      %s=%s\n' AWS_REGION "$region" AWS_ACCOUNT_ID "$acct" AWS_DEPLOY_ROLE_ARN "${ci_role:-<bootstrap output github_deploy_role_arn>}" TF_STATE_BUCKET "$ci_bucket" TF_LOCK_TABLE "$ci_table"
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 && [ -n "$ci_role" ]; then
-    if [ "$(ask "Set these 5 variables on $gh_repo now with the GitHub CLI? [y/N]")" = "y" ]; then
+    if [ "$(ask "gh_vars:$gh_repo" "Set these 5 variables on $gh_repo now with the GitHub CLI? [y/N]")" = "y" ]; then
       gh variable set AWS_REGION --body "$region" -R "$gh_repo" && gh variable set AWS_ACCOUNT_ID --body "$acct" -R "$gh_repo" \
         && gh variable set AWS_DEPLOY_ROLE_ARN --body "$ci_role" -R "$gh_repo" && gh variable set TF_STATE_BUCKET --body "$ci_bucket" -R "$gh_repo" \
         && gh variable set TF_LOCK_TABLE --body "$ci_table" -R "$gh_repo" && ok "5 variables set on $gh_repo; a push to main with 'check' now deploys"
@@ -112,10 +148,10 @@ if [ -f "$MANIFEST" ]; then
     sname="${line%% *}"; sdesc="${line#"$sname"}"; sdesc="$(echo "$sdesc" | xargs)"
     pname="/$NAME/secrets/$sname"
     if aws ssm get-parameter --region "$region" --name "$pname" >/dev/null 2>&1; then
-      [ "$(ask "  $sname already stored. Replace? [y/N]")" = "y" ] || { ok "  $sname kept"; continue; }
+      [ "$(ask "secret_replace:$sname" "  $sname already stored. Replace? [y/N]")" = "y" ] || { ok "  $sname kept"; continue; }
     fi
     printf '  %s%s: ' "$sname" "${sdesc:+ ($sdesc)}"
-    read -r -s value </dev/tty; echo
+    read -r -s value </dev/tty; echo         # silent, never through ask(): a secret is never cached
     [ -n "$value" ] || die "empty value for $sname"
     # Value goes in on stdin as JSON; it is never an argv token and never written to disk.
     jq -n --arg n "$pname" --arg v "$value" --arg d "SEFS secret (written by setup.sh only)" \
@@ -144,10 +180,13 @@ bash scripts/bruno-profile.sh install "$src_profile" "$region" "$NAME" >/dev/nul
 
 echo "== 6/6 deploy"
 if [ "$DEPLOY" = 1 ]; then
-  [ "$(ask "Run 'make up' now (≈8 min, ≈US\$0.16/h while live)? [y/N]")" = "y" ] || { warn "skipped; run 'make up' when ready"; exit 0; }
+  # Rate: `make cost`, ap-southeast-2, 2026-10-26 (README "Running cost"). Credits are finite: the stack
+  # burns them for as long as it is up, so the teardown is part of every test session.
+  [ "$(ask deploy "Run 'make up' now (≈8 min; then ≈US\$0.17/h ≈ US\$4.20/day of credits until './sefs down')? [y/N]")" = "y" ] || { warn "skipped; run 'make up' when ready"; exit 0; }
   make up AUTO=1
   echo
   ok "deployed. Next: 'make verify' (live checks), 'make e2e' (behaviour), 'make bruno' (Bruno collection), 'CONFIRM_DESTROY_DATA=yes make down' (teardown)"
+  warn "the stack is LIVE and burning ≈US\$0.17/h of credits; './sefs burn' shows the running total, './sefs down' stops it"
 else
   ok "--no-deploy: stopping before 'make up'"
 fi

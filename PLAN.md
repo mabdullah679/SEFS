@@ -111,8 +111,10 @@ Collaboration without overwriting = **hard file ownership + contracts first + on
 | Q2 | Bruno collection, self-hydrating from SSM via the read-only role | **Done, live-proven 2026-10-26** against the CI-deployed stack: 20 requests, 58/58 tests under `sefs-bruno-reader`; negative control (bogus SG IDs) fails R9 + group-exists. Fixed on the way: EC2 Query moved to GET (form body was rejected), Logs `filterPattern` JSON escaping, nested `<tagSet><item>` ending a rule early, and `FilterLogEvents` wide windows returning an empty first page (probe now read from the stream head). Mutations m30–m37 killed 8/8. |
 | Q3 | CI on GitHub Actions (D20) | **Done and live-proven 2026-10-25** (run 40216156247): S3 state + DynamoDB lock (bootstrap), OIDC deploy role pinned to `mabdullah679/SEFS` main (ID-form sub), `check` / `check full` keywords, adopt-orphans, verify 16/16 from GitHub |
 | Q4 | Mutation-prove everything above as it lands | pending |
+| Q10 | **Credits and inputs (owner, 2026-10-27):** keep every credit (the Oct 2026 "$8" was US$7.41 of burst usage fully offset by credits; nothing was left running, both accounts scrubbed the same day); the owner tests manually before the client handoff; `setup.sh` remembers every prompt answer for 24 h from entry, per boot session, never secrets | **Done 2026-10-27:** D30 input cache (`ask()` keyed by kernel boot time, `./sefs forget`, `SEFS_NO_CACHE=1`; selftest S6–S9, 4 mutations killed); D31 burn visibility (`make up`/`setup.sh` warn with the hourly and daily rate, `./sefs burn` and `./sefs status` show hours up × rate). **Not done (owner's consent needed):** an AWS Budgets alert on the payer account for pre-credit usage |
 
 Usage rule (owner, 2026-10-25): owner gates on `/usage`; small stoppable chunks; no agent fan-out without an explicit go.
+Credits rule (owner, 2026-10-27): credits are not free money; no deploy, e2e or `check` push by an agent; the stack is torn down at the end of every manual test session (D31).
 
 ## 8. Queue — client experience + observability + 2.5D GUI (owner, 2026-10-25; not yet built)
 

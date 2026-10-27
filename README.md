@@ -49,6 +49,7 @@ The host does **not** need Java, Maven or Python: both apps build inside Docker.
    ./sefs setup        # same as ./setup.sh
    ```
    It checks the tools, shows the account your credentials resolve to and asks you to confirm it, asks for the region, an alarm e-mail (optional) and your GitHub repo (`you/sefs`), writes the git-ignored `account.auto.tfvars`, creates the state bucket, lock table and CI role (once), prompts for any secret in [secrets.manifest](secrets.manifest) (none today) and stores it only in SSM, then runs `make up` (≈ 8 min). `./setup.sh --no-deploy` stops before the deploy.
+   Every answer you type is remembered for **24 hours from the moment you entered it, for the current boot session only** (`~/.cache/sefs/inputs.tsv`, keyed by the kernel boot time, so a restart, reboot or shutdown forgets everything); a re-run replays them and shows each one as `(cached answer …)`. Secrets are never remembered. `./sefs forget` clears the cache; `SEFS_NO_CACHE=1` ignores it for one run. Proven by `make test-setup` S6–S9.
 4. Wire CI once. `./sefs setup` prints the five values and, if the GitHub CLI is signed in, sets them for you when you answer `y`. Otherwise in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `AWS_REGION`, `AWS_ACCOUNT_ID`, `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_LOCK_TABLE` from `setup.sh`'s final output (no secrets: OIDC replaces keys). Details: [docs/CI.md](docs/CI.md#one-time-setup-owner-10-min).
 5. From now on, push to `main` with the whole word **`check`** in the commit message (`checks`/`checked` do not count): the changed children redeploy and the live checks run. `check full` redeploys everything.
 
@@ -56,7 +57,8 @@ Identical on macOS, Linux and WSL2 (`./sefs <verb>` and `make <verb>` are the sa
 
 ```bash
 ./sefs show efs                        # any deployed ID by keyword (efs, subnet, cluster, log, backup, ...) from SSM
-./sefs status                          # services, file system, alarms on one screen; also: logs writer|reader, alarms, url
+./sefs status                          # services, file system, alarms, credits burned, on one screen; also: logs writer|reader, alarms, url
+./sefs burn                            # how long the stack has been up and ≈ what it has cost so far (US$0.174/h); US$0 when nothing is deployed
 make verify                            # every requirement checked against live AWS + plan must be clean
 E2E_CONFIRM=yes make e2e               # write/read, read-only proof with the mount flag off, persistence
 make bruno                             # the Bruno collection (after make bruno-profile SOURCE=<login profile>)
@@ -123,7 +125,7 @@ Inputs: [variables.tf](variables.tf) (all with defaults; your values go in `acco
 | EFS, logs, ECR, backup storage at proof volumes | 0.001 |
 | **Total** | **0.174 per hour · 0.0029 per minute · 125.23 per 30 days** |
 
-Three quarters of it is the two NAT gateways; `nat_per_az = false` halves that line. Not metered: VPC, security groups, IAM, SNS at this volume, SSM, the state bucket and lock table (cents), NAT data processing (image pulls ≈ 0.5 GB per fresh deploy), GitHub Actions minutes (free for public repos). A 30-day figure from Cost Explorer actuals needs a stack that has run for days; this one has not, so the 30-day number above is rate × 720 h.
+**The stack burns this for every hour it is left up**, credits included: about US$4.20 a day. `make up` and `setup.sh` say so when they finish, `./sefs status` and `./sefs burn` show the running total (from the EFS creation time × the rate above; `SEFS_RATE_PER_HOUR` overrides the rate after a `make cost` in another region), and `CONFIRM_DESTROY_DATA=yes make down` is the end of every test session. A CI `check` push leaves the stack up too. Three quarters of it is the two NAT gateways; `nat_per_az = false` halves that line. Not metered: VPC, security groups, IAM, SNS at this volume, SSM, the state bucket and lock table (cents), NAT data processing (image pulls ≈ 0.5 GB per fresh deploy), GitHub Actions minutes (free for public repos). A 30-day figure from Cost Explorer actuals needs a stack that has run for days; this one has not, so the 30-day number above is rate × 720 h.
 
 ## Tests
 
@@ -141,7 +143,7 @@ make test-setup      # setup.sh with a fake aws: a secret never touches argv or 
 | Unit | 45/45 + 4/4 apply-mode (mocked) + static `prevent_destroy` check |
 | Mutation | 48/48 deliberate breaks caught; a no-op control break correctly survives |
 | Contract (Docker) | 16/16; with the reader mounted rw it fails, as it should |
-| Setup self-test | 5/5; mutation-proven |
+| Setup self-test | 9/9 (2026-10-27: S6–S9 cover the 24 h per-boot input cache); mutation-proven (boot check, 24 h expiry, cache off, secret through the cache: 4/4 killed) |
 | CI mapper self-test | 9/9; mutation-proven |
 | Live verifier self-test | 29/29 scenarios (stub AWS) |
 | Live (`ap-southeast-2`, 2026-10-25) | `make up` 55 resources ≈ 8 min; `make verify` 15/15 + zero drift; e2e E1–E4 pass (40 files round-tripped; reader denied with `readOnly=false`; 46 files survived destroy/re-apply); `make down` clean, account re-checked independently |

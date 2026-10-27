@@ -52,8 +52,8 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 | Goal | Command | Notes |
 |---|---|---|
-| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying; step 3c sets the five GitHub Actions variables through `gh` when signed in |
-| Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed |
+| Fresh clone, everything | `./sefs setup` (= `./setup.sh`) | tool checks → confirm AWS account → `account.auto.tfvars` (git-ignored) → bootstrap state → secrets → `make up`. `--no-deploy` stops before deploying; step 3c sets the five GitHub Actions variables through `gh` when signed in. Prompt answers are cached 24 h from entry, per boot session (`~/.cache/sefs/inputs.tsv`, keyed by kernel boot time; never secrets); `./sefs forget` clears, `SEFS_NO_CACHE=1` bypasses |
+| Read the live stack | `./sefs show <keyword>` · `./sefs status` · `./sefs logs writer\|reader` · `./sefs alarms` · `./sefs url` · `./sefs burn` | read-only; IDs come from SSM `/sefs/outputs/*`; refuses with a clear line when nothing is deployed. `burn` = hours up (EFS creation time) × US$0.174/h (`SEFS_RATE_PER_HOUR`) |
 | Deploy / redeploy | `make up` or `./sefs up` (`AUTO=1` skips the prompt) | preflight refuses the wrong account, a missing `backend.hcl`, or an `aws login` session profile (see §7) |
 | One child | `make apply-one CHILD=efs` | |
 | Live checks | `make verify` | every R-ID against AWS + `terraform plan` must be clean |
@@ -72,7 +72,7 @@ Account guard: `allowed_account_id` in `account.auto.tfvars` is enforced by the 
 | Unit, mocked provider, offline | `tests/unit/` | 45/45 + 4/4 apply-mode (2026-10-25) |
 | Mutation (each guard broken on purpose must be caught) | `tests/mutation/run.sh` | 48/48 killed, no-op control survives |
 | Docker contract (writer/reader as real UIDs) | `tests/contract/` | 16/16 |
-| setup.sh secret safety (fake `aws`) | `tests/setup/selftest.sh` | 5/5; mutation-proven |
+| setup.sh secret safety + input cache (fake `aws`) | `tests/setup/selftest.sh` | 9/9 (2026-10-27); mutation-proven (secret paths earlier; cache: boot check, 24 h expiry, cache off, secret via cache → 4/4 killed) |
 | CI change mapper | `tests/ci/selftest.sh` | 9/9; mutation-proven |
 | Live verify | `tests/live/verify.sh` | 16/16 + zero drift (2026-10-25, ap-southeast-2, run from GitHub Actions) |
 | Live e2e | `tests/live/e2e.sh` | E1–E4 pass (2026-10-25) |
@@ -104,6 +104,8 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 ## 7b. Standing rules (owner, 2026-10-25)
 
 Deterministic (everything pinned: D27), OOP where the language has objects (D28), a human approves CI deploys unless the client removes the environment reviewer (D29), no account-specific values in code (`account.auto.tfvars` + five repo variables are the only inputs), no secrets anywhere but SSM.
+
+**Credits are finite (owner, 2026-10-27).** The stack burns ≈ US$0.174/h (≈ US$4.20/day) for every hour it is up, credits or not; a `check` push leaves it up. An agent never runs `make up`, `make e2e`, or pushes with `check` on its own: the owner tests manually and tears down. `make up` and `setup.sh` print the burn warning; `./sefs burn` / `./sefs status` show the running total (D31).
 
 ## 8. If you are asked to change something
 

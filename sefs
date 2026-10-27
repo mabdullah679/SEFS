@@ -11,6 +11,11 @@ tfvar() { sed -nE "s/^$1 *= *\"([^\"]+)\".*/\1/p" account.auto.tfvars 2>/dev/nul
 NAME="${SEFS_NAME:-$(tfvar name)}"; NAME="${NAME:-sefs}"
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(tfvar region)}}"; REGION="${REGION:-ap-southeast-2}"
 export AWS_REGION="$REGION" AWS_PAGER=""
+# Burn rate of the whole stack while it is up: `make cost`, ap-southeast-2, 2026-10-26 (README "Running
+# cost"). Published rates, not an invoice; override with SEFS_RATE_PER_HOUR after a `make cost` elsewhere.
+RATE="${SEFS_RATE_PER_HOUR:-0.174}"
+# Where setup.sh keeps prompt answers for 24 h per boot session (same path as in setup.sh).
+CACHE="${SEFS_INPUT_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/sefs/inputs.tsv}"
 # A stalled API call must fail fast, not hang the screen: observed 2026-10-26, one EFS DescribeFileSystems
 # sat >3 min on the default 60 s read timeout x retries while the same call from a new process answered in 1 s.
 aws() { command aws --cli-connect-timeout 5 --cli-read-timeout 20 "$@"; }
@@ -21,11 +26,14 @@ sefs - one command for the whole project (region $REGION, project '$NAME')
 
 First time on a machine:
   ./sefs setup                 run this single command and enter inputs where requested
-                               (AWS account confirm, region, alarm e-mail, GitHub repo, secrets); it deploys at the end
+                               (AWS account confirm, region, alarm e-mail, GitHub repo, secrets); it deploys at the end.
+                               Answers are remembered for 24 h on this boot session (never secrets)
+  ./sefs forget                forget those remembered answers now (a restart/reboot/shutdown forgets them too)
 
 Deploy / test (wrap the Makefile; same names):
   ./sefs up | plan | apply CHILD=<child> | verify | e2e | bruno | cost | test | preflight
   ./sefs down                  destroy everything incl. the data (asks CONFIRM_DESTROY_DATA=yes)
+  ./sefs burn                  how long the stack has been up and roughly what it has cost so far (US\$$RATE/h)
 
 Read the live stack (read-only; works with any AWS login that can read SSM/ECS/EFS/CloudWatch):
   ./sefs show [keyword]        deployed IDs from the SSM registry, filtered by keyword (efs, subnet, cluster, log, backup, ...)
@@ -83,6 +91,32 @@ cmd_status() {
     | awk '{printf "state=%s encrypted=%s perf=%s throughput=%s mount_targets=%s bytes=%s\n", $1, $2, $3, $4, $5, $6}'
   echo "--- alarms"
   cmd_alarms
+  echo "--- credits"
+  burn_line "$fs"
+}
+
+burn_line() { # <file-system-id>: "up since" from the EFS creation time (the first thing `make up` builds that lives)
+  local created now_s up_s hours
+  created=$(aws efs describe-file-systems --file-system-id "$1" --query 'FileSystems[0].CreationTime' --output text)
+  [ -n "$created" ] && [ "$created" != "None" ] || { echo "up since: unknown (no creation time for $1)"; return 0; }
+  now_s=$(date +%s)
+  python3 - "$created" "$now_s" "$RATE" <<'PY'
+import sys, datetime
+created, now_s, rate = sys.argv[1], int(sys.argv[2]), float(sys.argv[3])
+start = datetime.datetime.fromisoformat(created.replace("Z", "+00:00"))
+h = max(0, now_s - int(start.timestamp())) / 3600
+print(f"up since {created} = {h:.1f} h; burned ≈ US${h*rate:.2f} so far at US${rate}/h (≈ US${rate*24:.2f}/day). './sefs down' stops it.")
+PY
+}
+
+cmd_burn() {
+  need aws; need python3
+  if [ -z "$(registry)" ]; then echo "nothing deployed in $REGION for project '$NAME': burning US\$0.00/h"; return 0; fi
+  burn_line "$(reg file_system_id)"
+}
+
+cmd_forget() {
+  if [ -f "$CACHE" ]; then rm -f "$CACHE" && echo "forgot the remembered setup answers ($CACHE)"; else echo "nothing remembered ($CACHE absent)"; fi
 }
 
 cmd_alarms() {
@@ -122,6 +156,8 @@ case "$cmd" in
   apply)          need make; exec make apply-one "$@" ;;
   show)           cmd_show "$@" ;;
   status)         cmd_status ;;
+  burn)           cmd_burn ;;
+  forget)         cmd_forget ;;
   alarms)         cmd_alarms ;;
   logs)           cmd_logs "$@" ;;
   url)            cmd_url ;;

@@ -47,6 +47,7 @@ init: ## terraform init against the shared S3 state (needs backend.hcl from `mak
 up: preflight init ## Deploy everything with ONE terraform apply (AUTO=1 to skip the prompt)
 	bash scripts/adopt-orphans.sh
 	$(TF) apply $(APPROVE)
+	@echo "LIVE: the stack now burns about US\$$0.17/h (US\$$4.20/day) of credits until 'make down'. './sefs burn' shows the running total."
 
 apply-one: init ## Update one child only: make apply-one CHILD=efs
 	@test -n "$(CHILD)" || { echo "usage: make apply-one CHILD=<name>"; exit 1; }
