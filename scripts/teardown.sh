@@ -11,11 +11,20 @@ if [[ "${CONFIRM_DESTROY_DATA:-}" != "yes" ]]; then
   exit 1
 fi
 
-region=$($TF output -raw region 2>/dev/null || echo "${AWS_REGION:-us-east-1}")
-name=$($TF output -raw name 2>/dev/null || echo "sefs")
-fs_id=$($TF output -raw file_system_id)
-fs_addr=$($TF state list | grep -E '^module\.efs\.aws_efs_file_system\.' || true)
-echo "Region=$region  Project tag=$name  EFS=$fs_id  state address=${fs_addr:-<none>}"
+# Inputs as JSON, never `output -raw`: on a half-destroyed state `-raw` printed its "No outputs found"
+# warning on STDOUT and the script used it as the region (2026-10-28, second pass of a teardown).
+out_json=$($TF output -json 2>/dev/null || echo '{}')
+oj() { jq -r --arg k "$1" '.[$k].value // empty' <<<"$out_json" 2>/dev/null; }
+region=$(oj region); [ -n "$region" ] || region=$(sed -nE 's/^region *= *"([^"]+)".*/\1/p' account.auto.tfvars 2>/dev/null | head -1)
+region=${region:-${AWS_REGION:-us-east-1}}
+name=$(oj name); [ -n "$name" ] || name=$(sed -nE 's/^name *= *"([^"]+)".*/\1/p' account.auto.tfvars 2>/dev/null | head -1); name=${name:-sefs}
+fs_id=$(oj file_system_id)
+# No output (state already emptied by an earlier pass)? The file system may still exist: find it by tag.
+if [[ -z "$fs_id" ]]; then
+  fs_id=$(aws efs describe-file-systems --region "$region" --query "FileSystems[?Tags[?Key=='Project'&&Value=='$name']].FileSystemId" --output text | tr '\t' ' ' | awk '{print $1}')
+fi
+fs_addr=$($TF state list 2>/dev/null | grep -E '^module\.efs\.aws_efs_file_system\.' || true)
+echo "Region=$region  Project tag=$name  EFS=${fs_id:-<none>}  state address=${fs_addr:-<none>}"
 
 if [[ -n "$fs_addr" ]]; then
   $TF state rm "$fs_addr"
@@ -23,17 +32,21 @@ fi
 
 $TF destroy -auto-approve
 
-echo "Waiting for mount targets on $fs_id to be gone..."
-for _ in $(seq 1 60); do
-  n=$(aws efs describe-mount-targets --region "$region" --file-system-id "$fs_id" --query 'length(MountTargets)' --output text 2>/dev/null || echo 0)
-  [[ "$n" == "0" ]] && break
-  sleep 10
-done
-aws efs delete-file-system --region "$region" --file-system-id "$fs_id"
-for _ in $(seq 1 30); do
-  aws efs describe-file-systems --region "$region" --file-system-id "$fs_id" >/dev/null 2>&1 || { echo "EFS $fs_id deleted"; break; }
-  sleep 10
-done
+if [[ -n "$fs_id" ]]; then
+  echo "Waiting for mount targets on $fs_id to be gone..."
+  for _ in $(seq 1 60); do
+    n=$(aws efs describe-mount-targets --region "$region" --file-system-id "$fs_id" --query 'length(MountTargets)' --output text 2>/dev/null || echo 0)
+    [[ "$n" == "0" ]] && break
+    sleep 10
+  done
+  aws efs delete-file-system --region "$region" --file-system-id "$fs_id"
+  for _ in $(seq 1 30); do
+    aws efs describe-file-systems --region "$region" --file-system-id "$fs_id" >/dev/null 2>&1 || { echo "EFS $fs_id deleted"; break; }
+    sleep 10
+  done
+else
+  echo "No file system tagged Project=$name to delete"
+fi
 
 # Terraform only deregisters the revision it holds in state (and leaves it INACTIVE forever). A targeted
 # destroy + re-apply (tests/live/e2e.sh E4) can leave earlier revisions ACTIVE outside state: observed
