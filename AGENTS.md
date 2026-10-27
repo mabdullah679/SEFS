@@ -93,7 +93,7 @@ Requirement → code → test map: [docs/TRACEABILITY.md](docs/TRACEABILITY.md).
 ## 7. Things that bit us (so you don't re-learn them)
 
 - Parallel `docker login` collides in the macOS keychain → each image build uses a throwaway Docker config with the ECR auth written inline.
-- An unbounded image push crawled for 2 h on a 35 KB/s uplink → watchdog + retry; the link needs ≳ 250 KB/s.
+- An unbounded image push crawled for 2 h on a 35 KB/s uplink → watchdog + retry; the link needs ≳ 250 KB/s. Measured 15 KB/s on 2026-10-27: both pushes hit the 20-min watchdog on attempt 1, so the owner's laptop deploys through CI (`check full`), where the runner builds and pushes in minutes; the map's page (a few hundred KB) uploaded fine from the laptop in 4 min.
 - Terraform only *deregisters* ECS task definitions → teardown deletes them and checks each service directly (the tagging API lags).
 - Terraform 1.9's S3 backend can't read `aws login` session profiles → `make tf-profile` creates `sefs-tf` (credential_process), preflight refuses otherwise.
 - Once the S3 backend is initialised, `init -backend=false` *reuses* it → offline suites use their own `TF_DATA_DIR`.
