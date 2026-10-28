@@ -72,12 +72,15 @@ export class OverviewScene extends SceneView {
     const slab = this.box(total + 2, 1.2, EFS_D, efs ? COLOR[efs.health] : TINT.slab, 0, 0);
     (slab.material as THREE.MeshLambertMaterial).color.lerp(new THREE.Color(TINT.slab), 0.55);
     if (efs) { this.pick(slab, this.pickable(efs)); this.label(`${efs.label} · ${efs.id}`, -total / 2 + 3, 1.9, 0); }
+    const pegsInAz = new Map<string, number>();
     for (const mt of by("mount-target")) {
       const at = mt.az ? pegAt.get(mt.az) : undefined;
-      if (!at) continue;
-      const m = this.box(1.2, 1.4, 1.2, COLOR[mt.health], at.x, at.z, 1.2 + 0.7);
+      if (!at || !mt.az) continue;
+      const i = pegsInAz.get(mt.az) ?? 0; pegsInAz.set(mt.az, i + 1);   // several mounts in one AZ (the local stack): fan them out
+      const x = at.x + (i - (by("mount-target").filter((o) => o.az === mt.az).length - 1) / 2) * 2.2;
+      const m = this.box(1.2, 1.4, 1.2, COLOR[mt.health], x, at.z, 1.2 + 0.7);
       this.pick(m, this.pickable(mt));
-      this.label(`mount ${mt.facts["ip"] ?? ""}`, at.x, 3.1, at.z, true);
+      this.label(`mount ${mt.facts["ip"] ?? ""}`, x, 3.1, at.z, true);
     }
     by("access-point").forEach((ap, j) => {
       const ax = -3 + j * 6, az_ = -EFS_D / 2 + 1;
