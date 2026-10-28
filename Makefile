@@ -5,7 +5,7 @@ TF    ?= terraform
 AUTO  ?=
 APPROVE := $(if $(AUTO),-auto-approve,)
 
-.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile cost preflight init up apply-one plan test test-unit test-mutation test-contract test-api test-web map-local verify e2e down
+.PHONY: help setup test-setup bruno-profile bruno bootstrap tf-profile cost preflight init up apply-one plan test test-unit test-mutation test-contract test-api test-web map-local local-up local-logs local-down verify e2e down
 
 help:
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -60,6 +60,16 @@ test: test-unit test-mutation test-contract test-setup test-api test-web ## All 
 
 test-api: ## The map's read-only API against a fake boto3 (no AWS, no network)
 	python3 -m unittest discover -s modules/gui/api/tests -v
+
+local-up: ## Writer + reader on a shared Docker volume, kept running (docker-compose.yml); no AWS
+	docker compose up -d --build
+	@echo "running: 'make local-logs' to watch WROTE/READ lines, 'make local-down' to stop and delete the volume"
+
+local-logs: ## Follow the local writer/reader logs
+	docker compose logs -f writer reader
+
+local-down: ## Stop the local pair and remove the shared volume
+	docker compose down -v --remove-orphans
 
 map-local: ## Run the map on http://localhost:8080 with no AWS (page built in Docker, API answered by the test suite's fake AWS; SCENARIO=ok|sg-open|reader-down|empty)
 	python3 modules/gui/dev/local.py --scenario "$${SCENARIO:-ok}"

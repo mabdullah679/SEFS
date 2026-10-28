@@ -1,0 +1,58 @@
+# SEFS on your laptop instead of the cloud: the real writer and reader on one shared Docker volume,
+# the same images the stack runs, kept running until you stop them (unlike tests/contract, which
+# tears itself down). No AWS, no EFS: the volume plays the file system; the access-point ownership
+# (root dir 1001:1000, mode 0775) is applied by the one-shot `init` service.
+#
+#   make local-up        docker compose up -d --build   (Java build inside Docker on first run, ~3-5 min)
+#   make local-logs      docker compose logs -f writer reader   (WROTE / READ / WRITE_PROBE lines)
+#   make local-down      docker compose down -v         (also removes the volume and its files)
+#
+# Not here: the 2.5D map. It reads AWS; for a local look at the page use `make map-local`.
+name: sefs-local
+
+services:
+  init:
+    image: sefs-local-writer
+    pull_policy: never
+    user: "0:0"
+    entrypoint: ["sh", "-c", "chown 1001:1000 /mnt/shared && chmod 0775 /mnt/shared"]
+    volumes:
+      - shared:/mnt/shared
+
+  writer:
+    build:
+      context: ./apps/writer-python
+    image: sefs-local-writer
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      SHARED_DIR: /mnt/shared
+      WRITER_INTERVAL_SECONDS: "5"   # same cadence as the stack
+    volumes:
+      - type: volume
+        source: shared
+        target: /mnt/shared
+    restart: unless-stopped
+
+  reader:
+    build:
+      context: ./apps/reader-springboot
+    image: sefs-local-reader
+    depends_on:
+      writer:
+        condition: service_started
+    environment:
+      SHARED_DIR: /mnt/shared
+      READER_POLL_SECONDS: "5"
+    volumes:
+      - type: volume
+        source: shared
+        target: /mnt/shared
+        read_only: true               # the stack's mount flag; the real control there is the EFS policy
+        volume:
+          nocopy: true
+    restart: unless-stopped
+
+volumes:
+  shared: {}

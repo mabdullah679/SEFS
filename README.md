@@ -108,6 +108,7 @@ An EFS access point has **no read-only setting**; it only sets user, group and d
 | `make test` | Unit + mutation + Docker contract + setup self-test + map API + map page build | no |
 | `make test-api` / `make test-web` | The map's API on a fake boto3 / the page built in Docker as the apply builds it | no |
 | `make map-local` | The map on `http://localhost:8080` with the API answered by the test suite's fake AWS (`SCENARIO=ok\|sg-open\|reader-down\|empty`); no login, nothing deployed | no |
+| `make local-up` / `local-logs` / `local-down` | The real writer and reader on a shared Docker volume, kept running ([docker-compose.yml](docker-compose.yml)); the volume stands in for the EFS | no |
 | `./sefs map` · `GET <api>/api/{overview,room/*,cost,logs}` | The map and its JSON (Cognito JWT required; GET only) | read-only |
 | `make verify` | Live checks + no-drift plan | read-only |
 | `E2E_CONFIRM=yes make e2e` | Live behaviour proofs | yes (one-off task; destroys + re-applies apps) |
