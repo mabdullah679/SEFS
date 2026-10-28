@@ -48,13 +48,19 @@ EOF
 # ---------- helpers
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing tool: $1" >&2; exit 1; }; }
 die() { echo "$*" >&2; exit 1; }
-registry() { # prints "key<TAB>value" for every /<name>/outputs/* parameter, sorted
-  aws ssm get-parameters-by-path --path "/$NAME/outputs" --recursive \
-    --query 'Parameters[].[Name,Value]' --output text 2>/dev/null | sed "s|^/$NAME/outputs/||" | sort
+registry() { # prints "key<TAB>value" for every /<name>/outputs/* parameter, sorted; an AWS error is an error, not "empty"
+  local out err
+  err=$(mktemp)
+  out=$(aws ssm get-parameters-by-path --path "/$NAME/outputs" --recursive --query 'Parameters[].[Name,Value]' --output text 2>"$err") \
+    || { echo "AWS call failed (not 'nothing deployed'): $(grep -v '^\s*$' "$err" | tail -1)" >&2; rm -f "$err"; return 1; }
+  rm -f "$err"
+  printf '%s\n' "$out" | sed "s|^/$NAME/outputs/||" | grep . | sort
 }
 reg() { registry | awk -F'\t' -v k="$1" '$1==k{print $2}'; }
-deployed_or_die() {
-  [ -n "$(registry)" ] || die "nothing deployed in $REGION for project '$NAME' (no /$NAME/outputs/* in SSM). Run ./sefs setup or ./sefs up."
+deployed_or_die() { # silence must never look like "nothing deployed": an expired login (observed 2026-10-28) is reported as such
+  local r
+  r=$(registry) || die "cannot read the registry: fix the AWS login first (e.g. aws login --profile <your login profile>), then retry."
+  [ -n "$r" ] || die "nothing deployed in $REGION for project '$NAME' (no /$NAME/outputs/* in SSM). Run ./sefs setup or ./sefs up."
 }
 
 # ---------- read-only commands
@@ -112,7 +118,9 @@ PY
 
 cmd_burn() {
   need aws; need python3
-  if [ -z "$(registry)" ]; then echo "nothing deployed in $REGION for project '$NAME': burning US\$0.00/h"; return 0; fi
+  local r
+  r=$(registry) || die "cannot read the registry: fix the AWS login first, then retry (the stack may well be up and burning)."
+  if [ -z "$r" ]; then echo "nothing deployed in $REGION for project '$NAME': burning US\$0.00/h"; return 0; fi
   burn_line "$(reg file_system_id)"
 }
 
