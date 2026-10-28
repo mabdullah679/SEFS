@@ -18,13 +18,15 @@ export class Auth {
 
   private get redirect(): string { return `${location.origin}/`; }
 
-  /** True when a usable (non-expired) ID token is at hand. */
+  /** True when a usable (non-expired) ID token is at hand. Local mode (dev server) needs none. */
   signedIn(): boolean {
+    if (this.cfg.local) return true;
     const t = this.tokens();
     return !!t && t.expires_at > Date.now() + 30_000;
   }
 
   idToken(): string {
+    if (this.cfg.local) return "local";
     const t = this.tokens();
     if (!t) throw new Error("not signed in");
     return t.id_token;
@@ -84,6 +86,7 @@ export class Auth {
   }
 
   logout(): void {
+    if (this.cfg.local) { location.reload(); return; }
     sessionStorage.removeItem(KEY);
     const q = new URLSearchParams({ client_id: this.cfg.clientId, logout_uri: this.redirect });
     location.assign(`${this.cfg.cognitoDomain}/logout?${q}`);

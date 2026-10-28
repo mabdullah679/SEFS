@@ -61,6 +61,7 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 | Live behaviour | `E2E_CONFIRM=yes make e2e` (`E2E_ONLY="e3"` for a subset) | write/read, IAM read-only proof, destroy-apps-and-recover |
 | Bruno collection | `make bruno-profile SOURCE=<login profile>` once, then `make bruno` | signs with a credential-free profile that assumes `sefs-bruno-reader`; hydrates IDs from SSM |
 | All local proofs (no AWS) | `make test` | unit (mocked), mutation, Docker contract, setup self-test, map API (fake boto3), map page build (Docker) |
+| The map on localhost, no AWS | `make map-local` (`SCENARIO=sg-open` etc.) | `modules/gui/dev/local.py`: real build + real Router on the tests' fake AWS; `config.json` says `local: true` so the page skips Cognito. Skill: `.claude/skills/run-map-locally` |
 | Tear down | `CONFIRM_DESTROY_DATA=yes make down` | deletes the EFS and its data; keeps state bucket unless `DESTROY_STATE=yes`; sweeps the account per service |
 | CI | push to `main` with `check` in the message | [docs/CI.md](docs/CI.md); first deploy on empty state is always full |
 

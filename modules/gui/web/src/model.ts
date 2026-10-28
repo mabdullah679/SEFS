@@ -53,6 +53,8 @@ export interface AppConfig {
   cognitoDomain: string;
   apiUrl: string;
   refreshSeconds: number;
+  /** true only when served by modules/gui/dev/local.py: no Cognito, the API is a local stand-in */
+  local?: boolean;
 }
 
 /** Which room a click on a node opens. */

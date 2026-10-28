@@ -15,6 +15,7 @@ Run this single command and enter inputs where requested: ./sefs setup (after si
 4. setup prints the values for GitHub and, if you are signed in to the GitHub command line, offers to set them for you. Otherwise add them yourself in your repository's Actions variables: the region, the account ID, the deploy role, the state bucket, the lock table, and optionally the map-login e-mail (without it, a deploy from GitHub creates no map user). No secrets are needed.
 5. From then on, push to main with the word "check" on its own in the commit message ("checks" does not count): only the pieces that changed are redeployed and every requirement is re-checked against live AWS. "check full" redeploys everything. A deploy waits for a human approval in GitHub if you keep the "production" environment's required reviewer switched on.
 
+To look at the map without deploying anything: make map-local serves it at http://localhost:8080 with made-up but realistic answers in place of AWS (no login needed; SCENARIO=sg-open, reader-down or empty show the unhealthy and empty states).
 Other commands: make verify (check every requirement against live AWS), make e2e (prove the behaviour, including that the reader can't write even with its read-only flag off), make bruno (the Bruno collection), ./sefs burn (how long the stack has been up and roughly what it has cost so far), ./sefs map (the map's address), and CONFIRM_DESTROY_DATA=yes make down (delete everything, including the data; the state storage stays unless you add DESTROY_STATE=yes).
 
 IF SOMETHING REFUSES TO RUN
