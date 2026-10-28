@@ -33,9 +33,10 @@ export interface RateItem { item: string; perHour: number; }
 export interface Rates { items: RateItem[]; perHour: number; perMinute: number; per30Days: number; region: string; source: string; fetchedAt?: string; }
 export interface Actuals { start: string; end: string; days: { date: string; usd: number }[]; totalUsd: number; }
 export interface CostReport {
-  rates: Rates;
+  rates: Rates | null;                 // null with a `note` when nothing is metered (the local Docker stack)
   actuals: Actuals | { error: string } | null;
-  live: { natGateways: number; vcpu: number; memoryGb: number; alarms: number };
+  live: { natGateways: number; vcpu: number; memoryGb: number; alarms: number; tasks?: number };
+  note?: string;
 }
 
 export interface LogLine { ts: number; message: string; }

@@ -3,7 +3,7 @@
 One Terraform apply builds, in your AWS account, a multi-AZ VPC, an encrypted EFS shared by two ECS Fargate apps (a Python writer and a Spring Boot reader on the same path, the reader unable to write), 35-day backups, an IA lifecycle, alarms and a dashboard, a read-only verification role, a login-gated 2.5D map of the live stack, and the state/CI plumbing so that every later change deploys itself from a push to `main`.
 Implements [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx); requirements are numbered R1–R15 in [PLAN.md §1](PLAN.md#1-requirements-numbered-so-every-file-and-test-can-cite-one). Agents: read [AGENTS.md](AGENTS.md) first.
 
-**Run this single command and enter inputs where requested:** `./sefs setup` (after signing in to AWS in your shell). Everything else is `./sefs <verb>`; `./sefs help` lists them. [sefs](sefs) is a thin wrapper over [setup.sh](setup.sh), the [Makefile](Makefile) and the SSM registry; the longer steps below are the same thing spelled out.
+**Run this single command and enter inputs where requested:** `./sefs setup` (after signing in to AWS in your shell). **No AWS account?** `./sefs local` runs the whole thing on your machine in Docker ([docs/LOCAL.md](docs/LOCAL.md)). Everything else is `./sefs <verb>`; `./sefs help` lists them. [sefs](sefs) is a thin wrapper over [setup.sh](setup.sh), the [Makefile](Makefile) and the SSM registry; the longer steps below are the same thing spelled out.
 
 ```
  your laptop ──./setup.sh──► bootstrap (state bucket, lock table, CI role)  ──┐
@@ -107,8 +107,8 @@ An EFS access point has **no read-only setting**; it only sets user, group and d
 | `make plan` | Show pending changes | read-only |
 | `make test` | Unit + mutation + Docker contract + setup self-test + map API + map page build | no |
 | `make test-api` / `make test-web` | The map's API on a fake boto3 / the page built in Docker as the apply builds it | no |
-| `make map-local` | The map on `http://localhost:8080` with the API answered by the test suite's fake AWS (`SCENARIO=ok\|sg-open\|reader-down\|empty`); no login, nothing deployed | no |
-| `make local-up` / `local-logs` / `local-down` | The real writer and reader on a shared Docker volume, kept running ([docker-compose.yml](docker-compose.yml)); the volume stands in for the EFS | no |
+| `make local-up` / `local-logs` / `local-down` | **Local-only deployment**: the real writer and reader on a shared Docker volume, kept running ([docker-compose.yml](docker-compose.yml)); guide: [docs/LOCAL.md](docs/LOCAL.md) | no |
+| `make map-local` | The map on `http://localhost:8080` reading that local pair (real containers, volume, network, logs; no login); with the pair stopped it falls back to canned answers (`SCENARIO=ok\|sg-open\|reader-down\|empty`) | no |
 | `./sefs map` · `GET <api>/api/{overview,room/*,cost,logs}` | The map and its JSON (Cognito JWT required; GET only) | read-only |
 | `make verify` | Live checks + no-drift plan | read-only |
 | `E2E_CONFIRM=yes make e2e` | Live behaviour proofs | yes (one-off task; destroys + re-applies apps) |
@@ -192,7 +192,8 @@ make test-web        # the map's page compiled in the pinned Node container, as 
 | [bruno/sefs](bruno/sefs) | Live verification collection |
 | [tests/unit](tests/unit) · [tests/mutation](tests/mutation/run.sh) · [tests/contract](tests/contract) · [tests/setup](tests/setup/selftest.sh) · [tests/ci](tests/ci/selftest.sh) · [tests/live](tests/live) | Test suites |
 | [AGENTS.md](AGENTS.md) | The whole picture in one file, for an agent that has never seen the repo |
-| [docs/CI.md](docs/CI.md) · [docs/COMPONENTS.md](docs/COMPONENTS.md) · [docs/CONTRACTS.md](docs/CONTRACTS.md) · [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/TRACEABILITY.md](docs/TRACEABILITY.md) | CI setup; component → child map; module contracts; decisions ledger; requirement → test map |
+| [docs/CI.md](docs/CI.md) · [docs/COMPONENTS.md](docs/COMPONENTS.md) · [docs/CONTRACTS.md](docs/CONTRACTS.md) · [docs/DECISIONS.md](docs/DECISIONS.md) · [docs/TRACEABILITY.md](docs/TRACEABILITY.md) · [docs/LOCAL.md](docs/LOCAL.md) | CI setup; component → child map; module contracts; decisions ledger; requirement → test map; the local-only deployment |
+| [docker-compose.yml](docker-compose.yml) · [modules/gui/dev](modules/gui/dev/local.py) · [.claude/skills](.claude/skills) | Local pair; the map's local server and Docker adapter; agent recipes (`run-local-stack`, `run-map-locally`) |
 | [PLAN.md](PLAN.md) | Requirements, plan, and the queue of what ships next (the 2.5D GUI, PLAN §8) |
 
 Every `.md` here has a plain-text `.txt` twin.

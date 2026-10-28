@@ -30,6 +30,11 @@ First time on a machine:
                                Answers are remembered for 24 h on this boot session (never secrets)
   ./sefs forget                forget those remembered answers now (a restart/reboot/shutdown forgets them too)
 
+No AWS at all (your machine only; needs Docker running):
+  ./sefs local                 the whole stack on localhost: writer + reader containers on a shared volume, then the
+                               map at http://localhost:8080 reading them (docs/LOCAL.md). Ctrl-C stops the map;
+  ./sefs local down            stops the containers and deletes the volume
+
 Deploy / test (wrap the Makefile; same names):
   ./sefs up | plan | apply CHILD=<child> | verify | e2e | bruno | cost | test | preflight
   ./sefs down                  destroy everything incl. the data (asks CONFIRM_DESTROY_DATA=yes)
@@ -169,6 +174,13 @@ cmd="${1:-help}"; shift || true
 case "$cmd" in
   help|-h|--help) usage ;;
   setup)          need bash; exec ./setup.sh "$@" ;;
+  local)          need make; need docker
+                  case "${1:-up}" in
+                    down) exec make local-down ;;
+                    up|"") docker info >/dev/null 2>&1 || die "Docker is not running: start Docker Desktop (or the engine), then retry."
+                           make local-up && exec make map-local ;;
+                    *) die "usage: ./sefs local [down]" ;;
+                  esac ;;
   up|plan|verify|e2e|bruno|cost|test|preflight|down|init|bootstrap|test-unit|test-mutation|test-contract|test-setup|tf-profile|bruno-profile)
                   need make; exec make "$cmd" "$@" ;;
   apply)          need make; exec make apply-one "$@" ;;

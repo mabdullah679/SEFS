@@ -61,8 +61,7 @@ Interfaces between children are fixed in [docs/CONTRACTS.md](docs/CONTRACTS.md).
 | Live behaviour | `E2E_CONFIRM=yes make e2e` (`E2E_ONLY="e3"` for a subset) | write/read, IAM read-only proof, destroy-apps-and-recover |
 | Bruno collection | `make bruno-profile SOURCE=<login profile>` once, then `make bruno` | signs with a credential-free profile that assumes `sefs-bruno-reader`; hydrates IDs from SSM |
 | All local proofs (no AWS) | `make test` | unit (mocked), mutation, Docker contract, setup self-test, map API (fake boto3), map page build (Docker) |
-| Writer + reader on localhost, no AWS | `make local-up` · `make local-logs` · `make local-down` | root `docker-compose.yml`: the same images the stack runs, on one Docker volume with the access-point ownership applied by an init step; kept running (tests/contract is the one-shot proof version) |
-| The map on localhost, no AWS | `make map-local` (`SCENARIO=sg-open` etc.) | `modules/gui/dev/local.py`: real build + real Router on the tests' fake AWS; `config.json` says `local: true` so the page skips Cognito. Skill: `.claude/skills/run-map-locally` |
+| **Local-only deployment**, no AWS | `./sefs local` (= `make local-up` → `make map-local`), `./sefs local down` | [docs/LOCAL.md](docs/LOCAL.md). Root `docker-compose.yml` runs the real writer + reader on one volume; `modules/gui/dev/local.py` serves the map and, via `local_docker.py`, feeds the real Router from `docker compose ps` / `inspect` / `volume` / `network` / `logs` (no stand-ins; what Docker lacks is reported absent or unknown). With the pair stopped it falls back to canned answers (`SCENARIO=…`). Skills: `run-local-stack`, `run-map-locally` |
 | Tear down | `CONFIRM_DESTROY_DATA=yes make down` | deletes the EFS and its data; keeps state bucket unless `DESTROY_STATE=yes`; sweeps the account per service |
 | CI | push to `main` with `check` in the message | [docs/CI.md](docs/CI.md); first deploy on empty state is always full |
 

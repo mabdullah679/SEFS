@@ -65,6 +65,8 @@ export class Hud {
   cost(c: CostReport): void {
     const usd = (n: number, p = 2) => `US$${n.toFixed(p)}`;
     const el = this.costBody; el.replaceChildren();
+    if (!c.rates) { el.className = "muted"; el.textContent = c.note ?? "no rates"; return; }
+    el.className = "";
     const big = document.createElement("div"); big.className = "big"; big.textContent = `${usd(c.rates.perHour, 3)} / h`; el.appendChild(big);
     const sub = document.createElement("div"); sub.className = "muted";
     sub.textContent = `${usd(c.rates.perMinute, 4)} / min · ${usd(c.rates.per30Days)} / 30 d at today's rates`; el.appendChild(sub);

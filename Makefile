@@ -58,8 +58,9 @@ plan: init ## Show pending changes against the shared state
 
 test: test-unit test-mutation test-contract test-setup test-api test-web ## All local (fake-AWS + Docker) proofs
 
-test-api: ## The map's read-only API against a fake boto3 (no AWS, no network)
+test-api: ## The map's read-only API against a fake boto3, and its Docker adapter against a fake docker CLI (no AWS, no Docker)
 	python3 -m unittest discover -s modules/gui/api/tests -v
+	python3 -m unittest discover -s modules/gui/dev/tests -v
 
 local-up: ## Writer + reader on a shared Docker volume, kept running (docker-compose.yml); no AWS
 	docker compose up -d --build
@@ -71,7 +72,7 @@ local-logs: ## Follow the local writer/reader logs
 local-down: ## Stop the local pair and remove the shared volume
 	docker compose down -v --remove-orphans
 
-map-local: ## Run the map on http://localhost:8080 with no AWS (page built in Docker, API answered by the test suite's fake AWS; SCENARIO=ok|sg-open|reader-down|empty)
+map-local: ## The map on http://localhost:8080 with no AWS: reads the local Docker pair when `make local-up` is running, else canned answers (SCENARIO=ok|sg-open|reader-down|empty); docs/LOCAL.md
 	python3 modules/gui/dev/local.py --scenario "$${SCENARIO:-ok}"
 
 test-web: ## Build the map page exactly as the apply does (pinned Node in Docker): type-check + vendored three.js

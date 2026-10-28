@@ -45,8 +45,9 @@ export class RoomScene extends SceneView {
           ...nodes("efs").map(fromNode),
           ...nodes("mount-target").map(fromNode),
           ...nodes("access-point").map(fromNode),
-          { id: "policy", label: "file-system policy", health: denied ? "ok" : "down",
-            lines: [["reader write denied", String(denied)], ["deny statements", String(room["denyStatements"] ?? 0)]] },
+          { id: "policy", label: room["localControl"] ? "write control (local)" : "file-system policy", health: denied ? "ok" : "down",
+            lines: [["reader write denied", String(denied)], ["deny statements", String(room["denyStatements"] ?? 0)],
+                    ...(room["localControl"] ? [["how", String(room["localControl"])] as [string, string]] : [])] },
           { id: "lifecycle", label: "IA lifecycle", health: arr(room["lifecycle"]).length ? "ok" : "warn",
             lines: arr(room["lifecycle"]).flatMap((l) => flat(l)) },
         ];

@@ -1,0 +1,30 @@
+LOCAL-ONLY DEPLOYMENT, NO AWS (plain twin of docs/LOCAL.md, 2026-10-28)
+
+WHAT IT IS
+The whole thing on one machine: the real Python writer and the real Java reader run as containers sharing one Docker volume that plays the file system, and the 2.5D map reads those containers instead of AWS. The only things not shown are the things Docker does not have (listed below). Nothing is simulated.
+
+WHAT YOU NEED
+Docker (Desktop or Engine, with Compose), Python 3, make and bash. Nothing else: Java, Maven and Node live inside containers. No AWS account or login. The first build downloads about 1.2 GB of base images.
+
+HOW TO RUN
+The one command after cloning is ./sefs local (it starts the containers and then the map and prints the address); ./sefs local down stops everything. Spelled out:
+1. Clone the repository and enter it.
+2. make local-up builds both apps (the Java build takes 3 to 5 minutes the first time) and starts them.
+3. make local-logs shows the writer writing a file every 5 seconds and the reader reading the same file with the same hash, plus the reader's refused write at start. Ctrl-C only stops the viewing.
+4. make map-local builds the map page (about a minute) and serves it at http://localhost:8080. No login locally. Hover for facts, click the volume, a task or the network to open its room.
+5. make local-down stops the containers and deletes the volume and its files.
+
+IF SOMETHING REFUSES TO RUN
+"the local stack is not running": run make local-up first. Port 8080 busy: start the map with --port 8081. The reader logs WRITE_PROBE ALLOWED: its mount lost the read-only flag in docker-compose.yml. Image downloads fail: pull the base images by hand and retry.
+
+WHAT THE MAP SHOWS LOCALLY
+Real: the network and its address range, the two containers as the two tasks (state, image, user, address, start time), the volume as the file system with its real size and file count, one mount point per container, the two users as the access points, and the containers' own log lines. Not shown because Docker has none: NAT gateways, security groups, alarms, backups (shown as unknown, "no backup locally"), a file-system policy (the reader's own refused-write log line is shown instead), and prices or spend ("not metered: this is your machine").
+
+TESTS
+make test-contract: the one-shot proof of the writer and reader on a volume, 16 checks. The map's Docker adapter has 6 tests against a fake docker command, the map's data service has 20 against a fake AWS; both need no Docker and no AWS.
+
+WHERE THINGS ARE
+docker-compose.yml at the root (the pair); modules/gui/dev/local.py (the map server) and local_docker.py (Docker read as if it were AWS); modules/gui/dev/tests (its tests); tests/contract (the one-shot proof); .claude/skills/run-local-stack (the recipe an AI agent follows).
+
+DESIGN CHOICES
+The map's logic was not copied for local use; the adapter answers the same questions the cloud version asks AWS, so health rules and rooms are identical. What Docker lacks is reported as absent or unknown, never invented. The read-only proof locally is the kernel refusing the reader's write, evidenced by the reader's own log line, the same line the cloud behaviour test checks.
