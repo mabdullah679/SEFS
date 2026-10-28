@@ -59,7 +59,7 @@ registry() { # prints "key<TAB>value" for every /<name>/outputs/* parameter, sor
 reg() { registry | awk -F'\t' -v k="$1" '$1==k{print $2}'; }
 deployed_or_die() { # silence must never look like "nothing deployed": an expired login (observed 2026-10-28) is reported as such
   local r
-  r=$(registry) || die "cannot read the registry: fix the AWS login first (e.g. aws login --profile <your login profile>), then retry."
+  r=$(registry) || die "cannot read the registry with profile '${AWS_PROFILE:-default}': sign that profile in (aws login --profile ${AWS_PROFILE:-default}) or point at a signed-in one (export AWS_PROFILE=<profile>), then retry."
   [ -n "$r" ] || die "nothing deployed in $REGION for project '$NAME' (no /$NAME/outputs/* in SSM). Run ./sefs setup or ./sefs up."
 }
 
@@ -119,7 +119,7 @@ PY
 cmd_burn() {
   need aws; need python3
   local r
-  r=$(registry) || die "cannot read the registry: fix the AWS login first, then retry (the stack may well be up and burning)."
+  r=$(registry) || die "cannot read the registry with profile '${AWS_PROFILE:-default}': sign in or export AWS_PROFILE=<signed-in profile>, then retry (the stack may well be up and burning)."
   if [ -z "$r" ]; then echo "nothing deployed in $REGION for project '$NAME': burning US\$0.00/h"; return 0; fi
   burn_line "$(reg file_system_id)"
 }
