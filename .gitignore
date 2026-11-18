@@ -65,3 +65,14 @@ build/
 target/
 .cache/
 *.tfplan
+
+# Credentials / editor / local-tooling litter (a public repo: keep these out by pattern, not by care)
+.env.*
+*.pem
+*.key
+*.p12
+terraform.tfvars
+*.auto.tfvars
+.venv/
+.idea/
+.vscode/

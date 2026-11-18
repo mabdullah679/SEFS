@@ -3,6 +3,9 @@ CI - PLAIN TWIN OF CI.md (2026-10-25)
 THE IDEA
 Set the project up once. After that, push to the main branch with the word "check" in the commit message and GitHub redeploys only what changed, confirms nothing drifted, and re-checks every requirement against live AWS.
 
+PULL REQUESTS
+Every pull request runs all the fake-AWS tests, the Docker tests and the map build (workflow ci.yml), plus a secrets scan over the files and the whole history. It has no AWS access and cannot deploy. Only the deploy part of the "check" workflow is allowed to ask for the AWS role, and only on a push to main.
+
 WHAT HAPPENS ON A "CHECK" PUSH
 1. On every push, the fake-AWS tests run (no AWS account needed).
 2. If the message contains the word "check" on its own (not "checks" or "checked"): GitHub borrows the deploy role (no AWS keys stored in GitHub), works out which pieces changed from the file paths (a module folder means that module; app code means the images and the apps; a root Terraform file means everything; docs and tests mean nothing to deploy; anything unknown means everything, to be safe), applies just those pieces using the shared state, confirms Terraform then sees no leftover changes, and runs the live checker.
