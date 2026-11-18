@@ -23,6 +23,7 @@ jobs:
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with: { terraform_version: "1.9.8", terraform_wrapper: false }
       - run: sudo apt-get install -y -q expect jq >/dev/null
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3      # the contract test builds linux/arm64 images; the runner is x86
       - run: make test-unit
       - run: make test-mutation
       - run: make test-contract
