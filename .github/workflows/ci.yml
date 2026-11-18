@@ -1,0 +1,47 @@
+# Pull-request gate: the same offline proofs `make test` runs locally, plus a secrets scan.
+# No AWS, no secrets, no deploy: read-only token, free runners. (Deploys are check.yml, push to main only.)
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-proofs:
+    name: unit + mutation + contract + selftests + map
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: "1.9.8", terraform_wrapper: false }
+      - run: sudo apt-get install -y -q expect jq >/dev/null
+      - run: make test-unit
+      - run: make test-mutation
+      - run: make test-contract
+      - run: bash tests/ci/selftest.sh
+      - run: make test-setup
+      - run: bash tests/live/selftest.sh
+      - run: make test-api
+      - run: make test-web
+
+  secrets-scan:
+    name: gitleaks (working tree + full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { fetch-depth: 0 }
+      - name: gitleaks 8.30.1 (release tarball, sha256-verified)
+        run: |
+          set -euo pipefail
+          curl -sSfL -o gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gl.tgz" | sha256sum -c -
+          tar -xzf gl.tgz gitleaks
+          ./gitleaks detect --no-banner --redact --verbose

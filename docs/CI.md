@@ -2,6 +2,10 @@
 
 Owner's intent (2026-10-25): set the project up once; afterwards, pushing to `main` with the word **check** in the commit message redeploys whatever changed and re-verifies, so you read results instead of fighting the system.
 
+## Pull requests: `ci.yml` (no AWS, no secrets)
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every pull request (and by hand): `make test-unit`, `make test-mutation`, `make test-contract`, the CI-mapper, setup and live-verifier selftests, `make test-api`, `make test-web`, and a second job that runs gitleaks 8.30.1 (sha256-verified tarball) over the working tree and the full history. Read-only token (`contents: read`), no AWS credentials, third-party actions pinned to commit SHAs. Deploys never run from a pull request: `check.yml` triggers on push to `main` only, and only its deploy job holds `id-token: write`.
+
 ## What a "check" push does
 
 `check full` in the message forces a full apply regardless of which paths changed (use it after a failed or cancelled run, or when a child was added).
