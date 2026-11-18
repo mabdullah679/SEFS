@@ -13,8 +13,7 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write   # OIDC to AWS
-  contents: read
+  contents: read    # workflow default; only the deploy job below also gets id-token
 
 concurrency:
   group: sefs-deploy       # one apply at a time; the state lock backs this up
@@ -42,6 +41,9 @@ jobs:
   deploy:
     name: apply changed children + verify
     needs: unit
+    permissions:
+      id-token: write   # OIDC to AWS (this job only)
+      contents: read
     environment: production   # HITL: a required reviewer on this environment holds every deploy for approval
     if: needs.unit.outputs.deploy == 'true'
     runs-on: ubuntu-latest
@@ -68,8 +70,9 @@ jobs:
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: which children changed
         id: diff
+        env: { BEFORE_SHA: "${{ github.event.before }}" }
         run: |
-          base="${{ github.event.before }}"
+          base="$BEFORE_SHA"
           git cat-file -e "$base" 2>/dev/null || base="$(git rev-parse HEAD~1)"
           echo "children=$(bash scripts/changed-children.sh "$base" HEAD)" | tee -a "$GITHUB_OUTPUT"
       - name: backend config from repository variables (written by `make bootstrap` locally)
