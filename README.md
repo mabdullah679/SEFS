@@ -152,14 +152,14 @@ make test-api        # the map's API on a fake boto3 that refuses any non-read c
 make test-web        # the map's page compiled in the pinned Node container, as the apply does it
 ```
 
-| Suite | Result on `main` (2026-10-25) |
+| Suite | Result on `main` (re-run 2026-11-18 unless dated) |
 |---|---|
 | Unit | 51/51 main (2026-10-27, incl. `gui.tftest.hcl` 6 runs) + 4/4 apply-mode (mocked) + static `prevent_destroy` check |
-| Mutation | 48/48 deliberate breaks caught; a no-op control break correctly survives; map rows g01–g07 (see the ledger line below) |
-| Map API (fake boto3) | 18/18: discovery, health rules (R9 on sg-efs, running ≥ desired, alarm states), rooms, rates + 24 h SSM cache + Cost Explorer failure reported not faked, logs filtered to contract lines, bad input → 400, non-read calls refused |
+| Mutation | 54/54 deliberate breaks caught (re-run 2026-11-18; includes map rows g01–g07); a no-op control break correctly survives |
+| Map API (fake boto3) | 20/20 (+ 6/6 for the local Docker adapter, re-run 2026-11-18): discovery, health rules (R9 on sg-efs, running ≥ desired, alarm states), rooms, rates + 24 h SSM cache + Cost Explorer failure reported not faked, logs filtered to contract lines, bad input → 400, non-read calls refused |
 | Contract (Docker) | 16/16; with the reader mounted rw it fails, as it should |
 | Setup self-test | 9/9 (2026-10-27: S6–S9 cover the 24 h per-boot input cache); mutation-proven (boot check, 24 h expiry, cache off, secret through the cache: 4/4 killed) |
-| CI mapper self-test | 9/9; mutation-proven |
+| CI mapper self-test | 11/11; mutation-proven |
 | Live verifier self-test | 29/29 scenarios (stub AWS) |
 | Live (`ap-southeast-2`, 2026-10-25) | `make up` 55 resources ≈ 8 min; `make verify` 15/15 + zero drift; e2e E1–E4 pass (40 files round-tripped; reader denied with `readOnly=false`; 46 files survived destroy/re-apply); `make down` clean, account re-checked independently |
 | GitHub Actions `check` (run 40216156247) | OIDC → shared state → full apply → zero drift → verify **16/16** incl. observability; deploy job 1 m 47 s |
@@ -188,7 +188,7 @@ make test-web        # the map's page compiled in the pinned Node container, as 
 | [modules/bootstrap](modules/bootstrap/main.tf) · [bootstrap/](bootstrap/main.tf) | State bucket, lock table, GitHub OIDC deploy role (once, local state) |
 | [apps/writer-python](apps/writer-python/writer.py) · [apps/reader-springboot](apps/reader-springboot/src/main/java/com/sefs/reader/SharedDirPoller.java) | The two apps |
 | [sefs](sefs) · [setup.sh](setup.sh) · [Makefile](Makefile) · [scripts/](scripts) | The one command (wrapper + keyword reads from SSM); fresh-clone setup; targets; teardown, orphan adoption, credential-free profiles, CI change mapper |
-| [.github/workflows/check.yml](.github/workflows/check.yml) | "check" push → changed children redeploy → verify |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) · [.github/workflows/check.yml](.github/workflows/check.yml) | Pull request → every offline proof + gitleaks (no AWS); "check" push → changed children redeploy → verify |
 | [bruno/sefs](bruno/sefs) | Live verification collection |
 | [tests/unit](tests/unit) · [tests/mutation](tests/mutation/run.sh) · [tests/contract](tests/contract) · [tests/setup](tests/setup/selftest.sh) · [tests/ci](tests/ci/selftest.sh) · [tests/live](tests/live) | Test suites |
 | [AGENTS.md](AGENTS.md) | The whole picture in one file, for an agent that has never seen the repo |

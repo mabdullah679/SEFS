@@ -4,7 +4,7 @@ Read this first. It is written for an agent (or a person) who has never seen thi
 
 ## 1. What this is
 
-A Terraform project that deploys, with **one command**, a shared AWS EFS file system used by two apps on ECS Fargate: a **Python writer** (writes JSON files) and a **Spring Boot reader** (reads the same path, and must not be able to write). Around it: a multi-AZ VPC, backups kept 35 days, an IA lifecycle, a least-privilege read-only role for verification, deployed IDs published to SSM, and a GitHub Actions workflow that redeploys only what changed when a push to `main` contains the word `check`.
+A Terraform project that deploys, with **one command**, a shared AWS EFS file system used by two apps on ECS Fargate: a **Python writer** (writes JSON files) and a **Spring Boot reader** (reads the same path, and must not be able to write). Around it: a multi-AZ VPC, backups kept 35 days, an IA lifecycle, a least-privilege read-only role for verification, deployed IDs published to SSM, and a GitHub Actions workflow that redeploys only what changed when a push to `main` contains the word `check`, and a pull-request workflow (`ci.yml`) that runs every offline proof plus a gitleaks scan.
 
 Spec: [Shared EFS for Multi-App.docx](Shared%20EFS%20for%20Multi-App.docx). Requirements are numbered **R1–R15** in [PLAN.md §1](PLAN.md); every test, mutation and live check cites one.
 
@@ -71,11 +71,11 @@ Account guard: `allowed_account_id` in `account.auto.tfvars` is enforced by the 
 
 | Layer | Where | Latest result |
 |---|---|---|
-| Unit, mocked provider, offline | `tests/unit/` | 45/45 + 4/4 apply-mode (2026-10-25) |
-| Mutation (each guard broken on purpose must be caught) | `tests/mutation/run.sh` | 48/48 killed, no-op control survives |
+| Unit, mocked provider, offline | `tests/unit/` | 51/51 + 4/4 apply-mode (re-run 2026-11-18) |
+| Mutation (each guard broken on purpose must be caught) | `tests/mutation/run.sh` | 54/54 killed, no-op control survives (re-run 2026-11-18) |
 | Docker contract (writer/reader as real UIDs) | `tests/contract/` | 16/16 |
 | setup.sh secret safety + input cache (fake `aws`) | `tests/setup/selftest.sh` | 9/9 (2026-10-27); mutation-proven (secret paths earlier; cache: boot check, 24 h expiry, cache off, secret via cache → 4/4 killed) |
-| CI change mapper | `tests/ci/selftest.sh` | 9/9; mutation-proven |
+| CI change mapper | `tests/ci/selftest.sh` | 11/11 (re-run 2026-11-18); mutation-proven |
 | Live verify | `tests/live/verify.sh` | 17/17 incl. GUI + zero drift (2026-10-27/28, deploys 1 and 2, from CI; from the laptop 17/17 on deploy 1 and 16/17 on deploy 2, the DRIFT line being the CI-created map user absent from the laptop's tfvars: a deployer-input mismatch, not a stack defect) |
 | Live e2e | `tests/live/e2e.sh` | E1–E5 pass on deploy 1 and again on deploy 2 (2026-10-28): 362 / 61 files, EROFS twice, 361 / 70 survived destroy/re-apply, map probe 30 nodes / 0 down |
 | Map in a browser | headless Chrome over CDP (`scratchpad`, not in the repo) | 2026-10-28: Cognito login round-trip, overview rendered all-ok, tooltip, EFS room; found the `hidden` overlay bug |
@@ -117,8 +117,8 @@ Deterministic (everything pinned: D27), OOP where the language has objects (D28)
 1. Find the child in §3; read its `variables.tf`/`outputs.tf` (the contract) before its `main.tf`.
 2. Change code, then add or adjust the unit assertion **and** a mutation row that would catch the regression.
 3. `make test` (offline). Then `make apply-one CHILD=<child>` or push with `check`.
-4. `make verify` must be 15/15 with zero drift. Record non-obvious choices in `docs/DECISIONS.md`.
+4. `make verify` must be 17/17 with zero drift (16/17 only when the laptop's tfvars differ from CI's, see §5). Record non-obvious choices in `docs/DECISIONS.md`.
 5. Never weaken a validation to pass a test; never put a secret in Terraform; never deploy to an account you have not confirmed.
 
 ---
-Tree checked 2026-10-25. Live-run dates are stated inline; anything without a date is a code-level fact.
+Tree checked 2026-10-25; test counts re-run 2026-11-18. Live-run dates are stated inline; anything without a date is a code-level fact.
